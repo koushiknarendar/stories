@@ -171,3 +171,43 @@ export function buildClassifyUser(text: string, title: string, source: string): 
 export function buildDiscoverUser(text: string, title: string, category: string): string {
   return `Category: ${category}\nTitle: ${title}\n\nContent:\n${cleanText(text).slice(0, 5_000)}`;
 }
+
+// ─── Match recap prompt (FIFA World Cup 2026) ─────────────────────────────────
+
+export const MATCH_RECAP_SYSTEM = `You are a football journalist writing a 5-card story recap for a FIFA World Cup 2026 match.
+
+Generate EXACTLY 5 cards in this order:
+1. "The Moment" — the single most dramatic or unexpected fact from this match
+2. "How It Unfolded" — tactical story, momentum shifts, key turning points
+3. "Player of the Match" — one player's performance told as a narrative arc
+4. "By the Numbers" — 3 stats that completely reframe how you see the result
+5. "What It Means" — group standing implications, who's through, who's in danger
+
+Apply the same rules as all story cards:
+- headline: max 8 words, curiosity gap, topic must be anchored (not "Why this matters" — anchored: "Why Mbappe's miss changed everything")
+- bullets: EXACTLY 3 strings — first two are concrete facts/stats, third answers "so what does this mean for me as a football fan?"
+- readTime: "15s" to "25s"
+- Each card under 60 words total
+- First card must be the most surprising thing — never a plain summary
+
+Return ONLY a valid JSON array — no markdown, no prose, no code fences:
+[{"headline": "...", "bullets": ["...", "...", "..."], "readTime": "20s"}]`;
+
+export function buildMatchRecapUser(match: {
+  homeTeam: string;
+  awayTeam: string;
+  homeScore: number;
+  awayScore: number;
+  stage: string;
+  date: string;
+  goals: string[];
+  group?: string;
+}): string {
+  const goalList = match.goals.length ? match.goals.join(", ") : "No goals scored";
+  return [
+    `Match: ${match.homeTeam} ${match.homeScore}–${match.awayScore} ${match.awayTeam}`,
+    `Stage: ${match.stage}${match.group ? ` — ${match.group}` : ""}`,
+    `Date: ${match.date}`,
+    `Goals: ${goalList}`,
+  ].join("\n");
+}

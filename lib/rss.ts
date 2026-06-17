@@ -40,6 +40,11 @@ const CATEGORY_FEEDS: Record<string, string[]> = {
     "https://feeds.feedburner.com/lifehacker/full",
     "https://rss.nytimes.com/services/xml/rss/nyt/Well.xml",
   ],
+  worldcup: [
+    "https://feeds.bbci.co.uk/sport/football/rss.xml",
+    "https://www.espn.com/espn/rss/soccer/news",
+    "https://www.theguardian.com/football/rss",
+  ],
 };
 
 export interface RssArticle {

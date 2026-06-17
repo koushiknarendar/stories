@@ -65,6 +65,38 @@ export default function DesktopNav() {
               </a>
             );
           })}
+
+          {/* World Cup 2026 — temporary link shown during the tournament */}
+          {(() => {
+            const now = new Date();
+            const wcEnd = new Date("2026-07-20T00:00:00Z");
+            if (now >= wcEnd) return null;
+            const active = pathname === "/worldcup";
+            return (
+              <a
+                href="/worldcup"
+                style={{
+                  display: "flex", alignItems: "center", gap: 14,
+                  padding: "11px 14px", borderRadius: 10, textDecoration: "none",
+                  color: active ? "var(--lp-text)" : "var(--lp-text2)",
+                  background: active ? "color-mix(in srgb, #F5C518 12%, transparent)" : "transparent",
+                  fontWeight: active ? 700 : 500,
+                  transition: "background .12s, color .12s",
+                  marginTop: 4,
+                  borderTop: "1px solid var(--lp-border)",
+                  paddingTop: 15,
+                }}
+                onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = "color-mix(in srgb, var(--lp-text) 5%, transparent)"; }}
+                onMouseLeave={(e) => { if (!active) e.currentTarget.style.background = active ? "color-mix(in srgb, #F5C518 12%, transparent)" : "transparent"; }}
+              >
+                <span style={{ fontSize: 18, lineHeight: 0, flexShrink: 0 }}>⚽</span>
+                <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
+                  <span style={{ ...SG, fontSize: 15 }}>World Cup</span>
+                  <span style={{ fontSize: 10, color: "#F5C518", fontWeight: 600 }}>LIVE NOW</span>
+                </div>
+              </a>
+            );
+          })()}
         </div>
 
         {/* Theme toggle */}
