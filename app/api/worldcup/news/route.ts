@@ -5,7 +5,8 @@ import { getOrGenerateDiscoverStories } from "@/lib/discover";
 
 export async function GET() {
   try {
-    const stories = await getOrGenerateDiscoverStories(["worldcup"]);
+    // Pull from worldcup + world for more content variety
+    const stories = await getOrGenerateDiscoverStories(["worldcup", "world", "culture"]);
     return Response.json({ stories }, {
       headers: { "Cache-Control": "public, max-age=300, stale-while-revalidate=3600" },
     });

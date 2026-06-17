@@ -81,28 +81,30 @@ export default function ExplorePage() {
         <div style={{ padding: "12px 16px 14px", overflowX: "auto", display: "flex", gap: 8, scrollbarWidth: "none" }}>
           {CATEGORIES.map(({ key, label, emoji }) => {
             const isActive = key === active;
+            const isWC = key === "worldcup";
+            const activeColor = isWC ? "#F5C518" : "var(--lp-accent)";
             return (
               <button
                 key={key}
-                onClick={() => setActive(key)}
+                onClick={() => key === "worldcup" ? (window.location.href = "/fifa-worldcup-2026") : setActive(key)}
                 style={{
                   ...SG,
                   flexShrink: 0,
                   padding: "7px 16px",
                   borderRadius: 999,
-                  border: `1.5px solid ${isActive ? "var(--lp-accent)" : "var(--lp-glass-border)"}`,
-                  background: isActive ? "color-mix(in srgb, var(--lp-accent) 14%, transparent)" : "var(--lp-glass-surface)",
+                  border: `1.5px solid ${isActive ? activeColor : isWC ? "rgba(245,197,24,0.4)" : "var(--lp-glass-border)"}`,
+                  background: isWC ? "rgba(245,197,24,0.1)" : isActive ? "color-mix(in srgb, var(--lp-accent) 14%, transparent)" : "var(--lp-glass-surface)",
                   backdropFilter: "var(--lp-glass-blur-card)",
                   WebkitBackdropFilter: "var(--lp-glass-blur-card)",
-                  color: isActive ? "var(--lp-accent)" : "var(--lp-text2)",
-                  fontWeight: isActive ? 700 : 500,
+                  color: isWC ? "#F5C518" : isActive ? "var(--lp-accent)" : "var(--lp-text2)",
+                  fontWeight: isWC || isActive ? 700 : 500,
                   fontSize: 13,
                   cursor: "pointer",
                   whiteSpace: "nowrap",
                   transition: "all .15s",
                 }}
               >
-                {emoji} {label}
+                {emoji} {label}{isWC ? " 🔴" : ""}
               </button>
             );
           })}

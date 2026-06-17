@@ -1,4 +1,5 @@
 export const CATEGORIES = [
+  { key: "worldcup",  label: "World Cup",  emoji: "⚽" },
   { key: "technology", label: "Technology", emoji: "🤖" },
   { key: "science",    label: "Science",    emoji: "🧬" },
   { key: "business",  label: "Business",   emoji: "💼" },
@@ -9,7 +10,6 @@ export const CATEGORIES = [
   { key: "philosophy",label: "Philosophy", emoji: "🧠" },
   { key: "culture",   label: "Culture",    emoji: "🎬" },
   { key: "lifestyle", label: "Lifestyle",  emoji: "🏃" },
-  { key: "worldcup",  label: "World Cup",  emoji: "⚽" },
 ] as const;
 
 export type CategoryKey = typeof CATEGORIES[number]["key"];

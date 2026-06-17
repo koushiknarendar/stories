@@ -7,62 +7,43 @@ import BottomNav from "@/components/BottomNav";
 
 const SG: React.CSSProperties = { fontFamily: "var(--font-space, 'Space Grotesk', sans-serif)" };
 const WC_GOLD = "#F5C518";
+const WC_BLUE = "#004C97";
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
-// ─── Types from football-data.org ────────────────────────────────────────────
+// ─── football-data.org Types ──────────────────────────────────────────────────
 
-interface FDTeam {
-  id: number;
-  name: string;
-  shortName: string;
-  tla: string;
-  crest: string;
-}
-
-interface FDGoal {
-  minute: number;
-  team: { name: string };
-  scorer: { name: string };
-  type: string;
-}
-
+interface FDTeam { id: number; name: string; shortName: string; tla: string; crest: string; }
+interface FDGoal { minute: number; team: { name: string }; scorer: { name: string }; type: string; }
 interface FDMatch {
-  id: number;
-  utcDate: string;
+  id: number; utcDate: string;
   status: "FINISHED" | "IN_PLAY" | "PAUSED" | "TIMED" | "SCHEDULED" | "SUSPENDED" | "POSTPONED";
-  matchday: number;
-  stage: string;
-  group: string | null;
-  homeTeam: FDTeam;
-  awayTeam: FDTeam;
-  score: {
-    winner: string | null;
-    fullTime: { home: number | null; away: number | null };
-    halfTime: { home: number | null; away: number | null };
-  };
+  matchday: number; stage: string; group: string | null;
+  homeTeam: FDTeam; awayTeam: FDTeam;
+  score: { winner: string | null; fullTime: { home: number | null; away: number | null }; halfTime: { home: number | null; away: number | null } };
   goals: FDGoal[];
-  minute?: number;
 }
-
+interface FDStandingRow {
+  position: number;
+  team: { id: number; name: string; shortName: string; tla: string; crest: string };
+  playedGames: number; won: number; draw: number; lost: number;
+  points: number; goalsFor: number; goalsAgainst: number; goalDifference: number;
+}
+interface FDGroup { stage: string; type: string; group: string | null; table: FDStandingRow[]; }
+interface FDScorer {
+  player: { id: number; name: string; nationality: string };
+  team: { id: number; name: string; shortName: string; tla: string; crest: string };
+  goals: number; assists: number; penalties: number;
+}
 interface NewsStory {
-  id: string;
-  title: string;
-  source: string;
-  source_url: string | null;
-  cover_image_url: string | null;
-  saved_at: string;
-  published_at?: string | null;
+  id: string; title: string; source: string; source_url: string | null;
+  cover_image_url: string | null; saved_at: string; published_at?: string | null;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function formatKickoff(utcDate: string): string {
-  const d = new Date(utcDate);
-  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-}
-
-function stageLabel(stage: string, group: string | null): string {
+function fmt(d: Date) { return d.toISOString().split("T")[0]; }
+function stageLabel(stage: string, group: string | null) {
   if (stage === "GROUP_STAGE") return group ? `Group ${group.replace("GROUP_", "")}` : "Group Stage";
   if (stage === "ROUND_OF_16") return "Round of 16";
   if (stage === "QUARTER_FINALS") return "Quarter-final";
@@ -70,129 +51,162 @@ function stageLabel(stage: string, group: string | null): string {
   if (stage === "FINAL") return "Final";
   return stage.replace(/_/g, " ");
 }
-
-function goalList(goals: FDGoal[], teamName: string): string[] {
-  return goals
-    .filter((g) => g.team.name === teamName && g.type !== "OWN")
-    .map((g) => `${g.scorer.name} ${g.minute}'`);
+function goalList(goals: FDGoal[], teamName: string) {
+  return (goals ?? []).filter(g => g.team.name === teamName && g.type !== "OWN").map(g => `${g.scorer.name} ${g.minute}'`);
 }
-
-function allGoals(goals: FDGoal[]): string[] {
-  return goals.map((g) => {
-    const og = g.type === "OWN" ? " (og)" : g.type === "PENALTY" ? " (pen)" : "";
-    return `${g.scorer.name} ${g.minute}'${og}`;
-  });
+function allGoals(goals: FDGoal[]) {
+  return (goals ?? []).map(g => `${g.scorer.name} ${g.minute}'${g.type === "OWN" ? " (og)" : g.type === "PENALTY" ? " (pen)" : ""}`);
 }
-
-function timeAgo(iso: string): string {
+function timeAgo(iso: string) {
   const diff = Date.now() - new Date(iso).getTime();
   const m = Math.floor(diff / 60000);
-  if (m < 1) return "just now";
-  if (m < 60) return `${m}m ago`;
+  if (m < 1) return "just now"; if (m < 60) return `${m}m ago`;
   const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
-  return `${Math.floor(h / 24)}d ago`;
+  if (h < 24) return `${h}h ago`; return `${Math.floor(h / 24)}d ago`;
 }
 
 // ─── MatchTile ────────────────────────────────────────────────────────────────
 
 function MatchTile({ match, onReadStory, generating }: {
-  match: FDMatch;
-  onReadStory: (match: FDMatch) => void;
-  generating: boolean;
+  match: FDMatch; onReadStory: (m: FDMatch) => void; generating: boolean;
 }) {
   const isFinished = match.status === "FINISHED";
   const isLive = match.status === "IN_PLAY" || match.status === "PAUSED";
-  const homeGoals = isFinished || isLive ? goalList(match.goals ?? [], match.homeTeam.name) : [];
-  const awayGoals = isFinished || isLive ? goalList(match.goals ?? [], match.awayTeam.name) : [];
+  const hGoals = isFinished || isLive ? goalList(match.goals ?? [], match.homeTeam.name) : [];
+  const aGoals = isFinished || isLive ? goalList(match.goals ?? [], match.awayTeam.name) : [];
 
   return (
-    <div style={{
-      minWidth: 220, maxWidth: 240, flexShrink: 0,
-      background: "var(--lp-surface)",
-      border: "1px solid var(--lp-border)",
-      borderRadius: 16, padding: "16px 16px 14px",
-      display: "flex", flexDirection: "column", gap: 10,
-    }}>
-      {/* Stage badge */}
+    <div style={{ minWidth: 230, maxWidth: 250, flexShrink: 0, background: "var(--lp-surface)", border: `1px solid ${isLive ? "rgba(229,62,62,0.4)" : "var(--lp-border)"}`, borderRadius: 16, padding: "14px 16px 12px", display: "flex", flexDirection: "column", gap: 10 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <span style={{ fontSize: 10, fontWeight: 600, color: "var(--lp-text3)", letterSpacing: "0.05em", textTransform: "uppercase" }}>
           {stageLabel(match.stage, match.group)}
         </span>
-        {isLive && (
+        {isLive ? (
           <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10, fontWeight: 700, color: "#e53e3e" }}>
-            <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#e53e3e", animation: "wc-pulse 1.2s ease-in-out infinite" }} />
-            LIVE
+            <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#e53e3e", animation: "wc-pulse 1.2s ease-in-out infinite" }} />LIVE
+          </span>
+        ) : isFinished ? (
+          <span style={{ fontSize: 10, fontWeight: 600, color: "var(--lp-text3)" }}>FT</span>
+        ) : (
+          <span style={{ fontSize: 10, fontWeight: 600, color: "var(--lp-text3)" }}>
+            {new Date(match.utcDate).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
           </span>
         )}
       </div>
 
-      {/* Teams + score */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-        {/* Home team */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-          <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
-            <span style={{ ...SG, fontSize: 13, fontWeight: 700, color: "var(--lp-text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-              {match.homeTeam.shortName || match.homeTeam.name}
-            </span>
-            {homeGoals.length > 0 && (
-              <span style={{ fontSize: 9, color: "var(--lp-text3)", lineHeight: 1.3 }}>
-                {homeGoals.join(", ")}
-              </span>
-            )}
+      {[
+        { team: match.homeTeam, goals: hGoals, score: match.score.fullTime.home },
+        { team: match.awayTeam, goals: aGoals, score: match.score.fullTime.away }
+      ].map(({ team, goals, score }, idx) => (
+        <div key={idx} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ ...SG, fontSize: 13, fontWeight: 700, color: "var(--lp-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{team.shortName || team.name}</div>
+            {goals.length > 0 && <div style={{ fontSize: 9, color: "var(--lp-text3)", lineHeight: 1.3 }}>{goals.join(", ")}</div>}
           </div>
           <span style={{ ...SG, fontSize: 22, fontWeight: 800, color: isFinished || isLive ? "var(--lp-text)" : "var(--lp-text3)", minWidth: 18, textAlign: "right" }}>
-            {isFinished || isLive ? (match.score.fullTime.home ?? 0) : "–"}
+            {isFinished || isLive ? (score ?? 0) : "–"}
           </span>
         </div>
+      ))}
 
-        {/* Away team */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-          <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
-            <span style={{ ...SG, fontSize: 13, fontWeight: 700, color: "var(--lp-text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-              {match.awayTeam.shortName || match.awayTeam.name}
-            </span>
-            {awayGoals.length > 0 && (
-              <span style={{ fontSize: 9, color: "var(--lp-text3)", lineHeight: 1.3 }}>
-                {awayGoals.join(", ")}
-              </span>
-            )}
-          </div>
-          <span style={{ ...SG, fontSize: 22, fontWeight: 800, color: isFinished || isLive ? "var(--lp-text)" : "var(--lp-text3)", minWidth: 18, textAlign: "right" }}>
-            {isFinished || isLive ? (match.score.fullTime.away ?? 0) : "–"}
-          </span>
-        </div>
-      </div>
-
-      {/* Status / CTA */}
       <div style={{ marginTop: 2 }}>
         {isFinished ? (
           <button
             onClick={() => onReadStory(match)}
             disabled={generating}
-            style={{
-              width: "100%", padding: "8px 12px", borderRadius: 8, border: "none",
-              background: generating ? "var(--lp-border)" : "var(--lp-accent)",
-              color: generating ? "var(--lp-text3)" : "#fff",
-              ...SG, fontSize: 12, fontWeight: 700, cursor: generating ? "not-allowed" : "pointer",
-              transition: "opacity .15s",
-              display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-            }}
+            style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "none", background: generating ? "var(--lp-border)" : WC_BLUE, color: generating ? "var(--lp-text3)" : "#fff", ...SG, fontSize: 12, fontWeight: 700, cursor: generating ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}
           >
-            {generating ? (
-              <>
-                <span style={{ width: 10, height: 10, borderRadius: "50%", border: "2px solid var(--lp-text3)", borderTopColor: "transparent", animation: "wc-spin .7s linear infinite", display: "inline-block" }} />
-                Generating…
-              </>
-            ) : "Read Story ⚡"}
+            {generating
+              ? <><span style={{ width: 10, height: 10, borderRadius: "50%", border: "2px solid var(--lp-text3)", borderTopColor: "transparent", animation: "wc-spin .7s linear infinite", display: "inline-block" }} />Generating…</>
+              : "Read Story ⚡"}
           </button>
         ) : isLive ? (
-          <div style={{ textAlign: "center", fontSize: 11, fontWeight: 700, color: "#e53e3e" }}>
-            In Progress
-          </div>
+          <div style={{ textAlign: "center", fontSize: 11, fontWeight: 700, color: "#e53e3e" }}>In Progress</div>
         ) : (
           <div style={{ textAlign: "center", fontSize: 11, color: "var(--lp-text3)" }}>
-            {formatKickoff(match.utcDate)} local
+            {new Date(match.utcDate).toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" })}
+            {" · "}{new Date(match.utcDate).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── GroupTable ───────────────────────────────────────────────────────────────
+
+function GroupTable({ group }: { group: FDGroup }) {
+  const [open, setOpen] = useState(false);
+  const label = group.group ? `Group ${group.group.replace("GROUP_", "")}` : group.stage;
+
+  return (
+    <div style={{ background: "var(--lp-surface)", border: "1px solid var(--lp-border)", borderRadius: 14, overflow: "hidden" }}>
+      <button
+        onClick={() => setOpen(v => !v)}
+        style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", background: "transparent", border: "none", cursor: "pointer", color: "var(--lp-text)" }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <span style={{ ...SG, fontSize: 13, fontWeight: 700 }}>{label}</span>
+          {group.table.length > 0 && (
+            <span style={{ fontSize: 11, color: "var(--lp-text3)" }}>
+              {group.table[0]?.team.tla} · {group.table[1]?.team.tla} · {group.table[2]?.team.tla} · {group.table[3]?.team.tla}
+            </span>
+          )}
+        </div>
+        <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform .2s", color: "var(--lp-text3)", flexShrink: 0 }}>
+          <path d="M6 9l6 6 6-6" />
+        </svg>
+      </button>
+
+      {open && (
+        <div style={{ borderTop: "1px solid var(--lp-border)" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 28px 28px 28px 28px 36px", gap: 4, padding: "7px 16px", background: "var(--lp-page-bg)" }}>
+            {["Team", "P", "W", "D", "L", "Pts"].map((h, i) => (
+              <span key={i} style={{ fontSize: 10, fontWeight: 700, color: "var(--lp-text3)", textTransform: "uppercase", textAlign: i > 0 ? "center" : "left" }}>{h}</span>
+            ))}
+          </div>
+          {group.table.map((row, i) => (
+            <div key={row.team.id} style={{ display: "grid", gridTemplateColumns: "1fr 28px 28px 28px 28px 36px", gap: 4, padding: "8px 16px", borderTop: "1px solid var(--lp-border)", background: i < 2 ? "color-mix(in srgb, #22c55e 4%, transparent)" : "transparent" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                <span style={{ fontSize: 10, color: "var(--lp-text3)", width: 12 }}>{row.position}</span>
+                {i < 2 && <span style={{ width: 3, height: 14, borderRadius: 2, background: "#22c55e", flexShrink: 0 }} />}
+                <span style={{ ...SG, fontSize: 12, fontWeight: 600, color: "var(--lp-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{row.team.shortName || row.team.tla}</span>
+              </div>
+              {[row.playedGames, row.won, row.draw, row.lost].map((v, j) => (
+                <span key={j} style={{ fontSize: 12, color: "var(--lp-text2)", textAlign: "center" }}>{v}</span>
+              ))}
+              <span style={{ ...SG, fontSize: 13, fontWeight: 800, color: "var(--lp-text)", textAlign: "center" }}>{row.points}</span>
+            </div>
+          ))}
+          <div style={{ padding: "6px 16px 8px", display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ width: 8, height: 8, borderRadius: 2, background: "#22c55e" }} />
+            <span style={{ fontSize: 10, color: "var(--lp-text3)" }}>Advances to Round of 16</span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── ScorerRow ────────────────────────────────────────────────────────────────
+
+function ScorerRow({ scorer, rank }: { scorer: FDScorer; rank: number }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 0", borderBottom: "1px solid var(--lp-border)" }}>
+      <span style={{ ...SG, fontSize: 14, fontWeight: 800, color: rank <= 3 ? WC_GOLD : "var(--lp-text3)", width: 22, textAlign: "center", flexShrink: 0 }}>{rank}</span>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ ...SG, fontSize: 14, fontWeight: 700, color: "var(--lp-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{scorer.player.name}</div>
+        <div style={{ fontSize: 11, color: "var(--lp-text3)" }}>{scorer.team.shortName || scorer.team.name} · {scorer.player.nationality}</div>
+      </div>
+      <div style={{ display: "flex", gap: 16, flexShrink: 0 }}>
+        <div style={{ textAlign: "center" }}>
+          <div style={{ ...SG, fontSize: 22, fontWeight: 800, color: rank === 1 ? WC_GOLD : "var(--lp-text)", lineHeight: 1 }}>{scorer.goals}</div>
+          <div style={{ fontSize: 9, color: "var(--lp-text3)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Goals</div>
+        </div>
+        {scorer.assists > 0 && (
+          <div style={{ textAlign: "center" }}>
+            <div style={{ ...SG, fontSize: 22, fontWeight: 800, color: "var(--lp-text2)", lineHeight: 1 }}>{scorer.assists}</div>
+            <div style={{ fontSize: 9, color: "var(--lp-text3)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Ast</div>
           </div>
         )}
       </div>
@@ -204,20 +218,15 @@ function MatchTile({ match, onReadStory, generating }: {
 
 function NewsCard({ story }: { story: NewsStory }) {
   return (
-    <a
-      href={`/stories/${story.id}`}
-      style={{ display: "block", textDecoration: "none", borderRadius: 14, overflow: "hidden", background: "var(--lp-surface)", border: "1px solid var(--lp-border)" }}
-    >
+    <a href={`/stories/${story.id}`} style={{ display: "block", textDecoration: "none", borderRadius: 14, overflow: "hidden", background: "var(--lp-surface)", border: "1px solid var(--lp-border)" }}>
       {story.cover_image_url && (
         <div style={{ height: 120, overflow: "hidden" }}>
           <img src={story.cover_image_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
         </div>
       )}
       <div style={{ padding: "12px 14px 14px" }}>
-        <p style={{ ...SG, fontSize: 13, fontWeight: 700, color: "var(--lp-text)", margin: "0 0 6px", lineHeight: 1.35 }}>
-          {story.title}
-        </p>
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <p style={{ ...SG, fontSize: 13, fontWeight: 700, color: "var(--lp-text)", margin: "0 0 6px", lineHeight: 1.35 }}>{story.title}</p>
+        <div style={{ display: "flex", gap: 6 }}>
           <span style={{ fontSize: 10, color: "var(--lp-text3)" }}>{story.source}</span>
           <span style={{ fontSize: 10, color: "var(--lp-border)" }}>·</span>
           <span style={{ fontSize: 10, color: "var(--lp-text3)" }}>{timeAgo(story.published_at ?? story.saved_at)}</span>
@@ -232,35 +241,44 @@ function NewsCard({ story }: { story: NewsStory }) {
 export default function WorldCupPage() {
   const router = useRouter();
   const [generatingId, setGeneratingId] = useState<number | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [genError, setGenError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<"matches" | "standings" | "scorers">("matches");
+
+  const today = new Date();
+  const dateFrom = fmt(new Date(today.getTime() - 2 * 86_400_000));
+  const dateTo   = fmt(new Date(today.getTime() + 2 * 86_400_000));
 
   const { data: matchData, isLoading: matchLoading } = useSWR(
-    "/api/worldcup",
-    fetcher,
-    { refreshInterval: 60_000 }
+    `/api/worldcup?dateFrom=${dateFrom}&dateTo=${dateTo}`, fetcher, { refreshInterval: 60_000 }
   );
-
-  const { data: newsData, isLoading: newsLoading } = useSWR(
-    "/api/worldcup/news",
-    fetcher
+  const { data: standingsData, isLoading: standingsLoading } = useSWR(
+    activeTab === "standings" ? "/api/worldcup/standings" : null, fetcher
   );
+  const { data: scorersData, isLoading: scorersLoading } = useSWR(
+    activeTab === "scorers" ? "/api/worldcup/scorers" : null, fetcher
+  );
+  const { data: newsData, isLoading: newsLoading } = useSWR("/api/worldcup/news", fetcher);
 
   const matches: FDMatch[] = Array.isArray(matchData?.matches) ? matchData.matches : [];
+  const groups: FDGroup[] = Array.isArray(standingsData?.standings)
+    ? standingsData.standings.filter((g: FDGroup) => g.type === "TOTAL") : [];
+  const scorers: FDScorer[] = Array.isArray(scorersData?.scorers) ? scorersData.scorers : [];
   const news: NewsStory[] = Array.isArray(newsData?.stories) ? newsData.stories : [];
 
-  // Sort: live first, then by date desc (recent finished → upcoming)
   const sortedMatches = [...matches].sort((a, b) => {
-    const priority = (m: FDMatch) =>
-      m.status === "IN_PLAY" || m.status === "PAUSED" ? 0
-      : m.status === "FINISHED" ? 1
-      : 2;
-    const pd = priority(a) - priority(b);
+    const p = (m: FDMatch) => m.status === "IN_PLAY" || m.status === "PAUSED" ? 0 : m.status === "FINISHED" ? 1 : 2;
+    const pd = p(a) - p(b);
     if (pd !== 0) return pd;
-    return new Date(b.utcDate).getTime() - new Date(a.utcDate).getTime();
+    if (a.status === "FINISHED") return new Date(b.utcDate).getTime() - new Date(a.utcDate).getTime();
+    return new Date(a.utcDate).getTime() - new Date(b.utcDate).getTime();
   });
 
+  const liveCount     = matches.filter(m => m.status === "IN_PLAY" || m.status === "PAUSED").length;
+  const finishedCount = matches.filter(m => m.status === "FINISHED").length;
+  const upcomingCount = matches.length - finishedCount - liveCount;
+
   async function handleReadStory(match: FDMatch) {
-    setError(null);
+    setGenError(null);
     setGeneratingId(match.id);
     try {
       const res = await fetch("/api/worldcup/recap", {
@@ -268,147 +286,168 @@ export default function WorldCupPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           matchId: match.id,
-          homeTeam: match.homeTeam.name,
-          awayTeam: match.awayTeam.name,
-          homeScore: match.score.fullTime.home ?? 0,
-          awayScore: match.score.fullTime.away ?? 0,
-          stage: stageLabel(match.stage, match.group),
-          date: match.utcDate,
-          goals: allGoals(match.goals ?? []),
-          group: match.group ?? undefined,
+          homeTeam: match.homeTeam.name, awayTeam: match.awayTeam.name,
+          homeScore: match.score.fullTime.home ?? 0, awayScore: match.score.fullTime.away ?? 0,
+          stage: stageLabel(match.stage, match.group), date: match.utcDate,
+          goals: allGoals(match.goals ?? []), group: match.group ?? undefined,
         }),
       });
       const data = await res.json();
       if (!res.ok || !data.id) throw new Error(data.error ?? "Failed to generate recap");
       router.push(`/stories/${data.id}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
+      setGenError(err instanceof Error ? err.message : "Something went wrong");
       setGeneratingId(null);
     }
   }
 
-  const hasMatches = sortedMatches.length > 0;
-  const hasNews = news.length > 0;
+  const TABS = [
+    { key: "matches" as const,   label: "Matches" },
+    { key: "standings" as const, label: "Standings" },
+    { key: "scorers" as const,   label: "Top Scorers" },
+  ];
 
   return (
     <div style={{ minHeight: "100vh", background: "var(--lp-page-bg)", color: "var(--lp-text)", paddingBottom: "calc(78px + env(safe-area-inset-bottom, 0px))" }}>
-
       <style>{`
         @keyframes wc-spin  { to { transform: rotate(360deg); } }
         @keyframes wc-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
       `}</style>
 
-      {/* Header */}
-      <div style={{
-        background: `linear-gradient(135deg, #004C97 0%, #002D62 60%, #001a38 100%)`,
-        padding: "calc(env(safe-area-inset-top, 0px) + 32px) 20px 28px",
-        position: "relative", overflow: "hidden",
-      }}>
-        {/* Decorative football pattern */}
-        <div style={{ position: "absolute", top: -30, right: -30, fontSize: 120, opacity: 0.06, userSelect: "none", lineHeight: 1 }}>⚽</div>
-        <div style={{ position: "absolute", bottom: -20, left: -20, fontSize: 80, opacity: 0.04, userSelect: "none", lineHeight: 1 }}>⚽</div>
+      {/* ── Hero ─────────────────────────────────────────────────────────────── */}
+      <div style={{ background: `linear-gradient(145deg, ${WC_BLUE} 0%, #002D62 55%, #001025 100%)`, padding: "calc(env(safe-area-inset-top, 0px) + 28px) 20px 0", position: "relative", overflow: "hidden" }}>
+        <div style={{ position: "absolute", top: -60, right: -60, width: 280, height: 280, borderRadius: "50%", background: "rgba(245,197,24,0.07)", pointerEvents: "none" }} />
+        <div style={{ position: "absolute", bottom: 20, left: -40, width: 180, height: 180, borderRadius: "50%", background: "rgba(255,255,255,0.03)", pointerEvents: "none" }} />
 
         <div style={{ position: "relative" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
-            <span style={{ fontSize: 28 }}>⚽</span>
+          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 10 }}>
             <div>
-              <div style={{ ...SG, fontSize: 22, fontWeight: 800, color: "#fff", letterSpacing: "-0.02em", lineHeight: 1.1 }}>
-                World Cup 2026
-              </div>
-              <div style={{ fontSize: 11, color: WC_GOLD, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase" }}>
-                USA · Canada · Mexico
-              </div>
+              <div style={{ ...SG, fontSize: 11, fontWeight: 700, color: WC_GOLD, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 4 }}>⚽ FIFA World Cup 2026</div>
+              <div style={{ ...SG, fontSize: 26, fontWeight: 800, color: "#fff", letterSpacing: "-0.025em", lineHeight: 1.1 }}>USA · Canada · Mexico</div>
+              <div style={{ fontSize: 12, color: "rgba(255,255,255,0.45)", marginTop: 4 }}>Jun 12 – Jul 19, 2026 · 48 nations · 104 matches</div>
             </div>
+            {liveCount > 0 && (
+              <div style={{ display: "flex", alignItems: "center", gap: 5, background: "rgba(229,62,62,0.2)", border: "1px solid rgba(229,62,62,0.4)", padding: "6px 12px", borderRadius: 999, flexShrink: 0 }}>
+                <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#e53e3e", animation: "wc-pulse 1.2s ease-in-out infinite" }} />
+                <span style={{ ...SG, fontSize: 12, fontWeight: 700, color: "#e53e3e" }}>{liveCount} Live</span>
+              </div>
+            )}
           </div>
-          <p style={{ fontSize: 12, color: "rgba(255,255,255,0.6)", margin: 0, lineHeight: 1.4 }}>
-            Tap any finished match to read its story in 5 cards
-          </p>
+
+          {/* Stats strip */}
+          {matches.length > 0 && (
+            <div style={{ display: "flex", marginBottom: 18 }}>
+              {[{ v: finishedCount, l: "Played" }, { v: liveCount, l: "Live" }, { v: upcomingCount, l: "Upcoming" }].map(({ v, l }, i) => (
+                <div key={i} style={{ flex: 1, textAlign: "center", padding: "10px 4px", borderRight: i < 2 ? "1px solid rgba(255,255,255,0.1)" : "none" }}>
+                  <div style={{ ...SG, fontSize: 22, fontWeight: 800, color: "#fff" }}>{v}</div>
+                  <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "0.06em" }}>{l}</div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Tabs */}
+          <div style={{ display: "flex", borderTop: "1px solid rgba(255,255,255,0.1)" }}>
+            {TABS.map(t => (
+              <button
+                key={t.key}
+                onClick={() => setActiveTab(t.key)}
+                style={{ flex: 1, padding: "12px 4px", background: "transparent", border: "none", cursor: "pointer", ...SG, fontSize: 13, fontWeight: activeTab === t.key ? 700 : 500, color: activeTab === t.key ? WC_GOLD : "rgba(255,255,255,0.45)", borderBottom: `2px solid ${activeTab === t.key ? WC_GOLD : "transparent"}`, transition: "all .15s" }}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
-      {/* Error banner */}
-      {error && (
-        <div style={{ margin: "12px 16px 0", padding: "10px 14px", borderRadius: 10, background: "rgba(229,62,62,0.12)", border: "1px solid rgba(229,62,62,0.3)", fontSize: 12, color: "#e53e3e" }}>
-          {error}
+      {/* Error */}
+      {genError && (
+        <div style={{ margin: "12px 16px 0", padding: "10px 14px", borderRadius: 10, background: "rgba(229,62,62,0.12)", border: "1px solid rgba(229,62,62,0.3)", fontSize: 12, color: "#e53e3e" }}>{genError}</div>
+      )}
+
+      {/* ── MATCHES ──────────────────────────────────────────────────────────── */}
+      {activeTab === "matches" && (
+        <div style={{ paddingTop: 20 }}>
+          {matchLoading ? (
+            <div style={{ padding: "0 20px", display: "flex", gap: 12 }}>
+              {[1,2,3].map(i => <div key={i} style={{ minWidth: 230, height: 170, borderRadius: 16, background: "var(--lp-surface)", border: "1px solid var(--lp-border)", flexShrink: 0 }} />)}
+            </div>
+          ) : matchData?.error ? (
+            <div style={{ padding: "12px 20px" }}>
+              <div style={{ padding: "14px 16px", borderRadius: 12, background: "var(--lp-surface)", border: "1px solid var(--lp-border)", fontSize: 12, color: "var(--lp-text3)" }}>
+                <strong style={{ color: "var(--lp-text)" }}>Live scores unavailable.</strong> Check your <code>FOOTBALL_DATA_API_KEY</code>.
+              </div>
+            </div>
+          ) : sortedMatches.length === 0 ? (
+            <div style={{ padding: "20px", fontSize: 13, color: "var(--lp-text3)" }}>No matches in this window.</div>
+          ) : (
+            <div style={{ display: "flex", gap: 12, overflowX: "auto", padding: "0 20px 4px", scrollbarWidth: "none" }}>
+              {sortedMatches.map(m => (
+                <MatchTile key={m.id} match={m} onReadStory={handleReadStory} generating={generatingId === m.id} />
+              ))}
+            </div>
+          )}
+          <p style={{ fontSize: 11, color: "var(--lp-text3)", margin: "8px 20px 0" }}>
+            Showing ±2 days · Tap any finished match for a 5-card AI story
+          </p>
         </div>
       )}
 
-      {/* ── Match Ticker ─────────────────────────────────────────────────────── */}
-      <div style={{ padding: "24px 0 0" }}>
-        <div style={{ padding: "0 20px", display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 12 }}>
-          <h2 style={{ ...SG, fontSize: 16, fontWeight: 700, margin: 0, color: "var(--lp-text)" }}>
-            Matches
-          </h2>
-          {hasMatches && (
-            <span style={{ fontSize: 11, color: "var(--lp-text3)" }}>
-              Yesterday · Today · Tomorrow
-            </span>
+      {/* ── STANDINGS ────────────────────────────────────────────────────────── */}
+      {activeTab === "standings" && (
+        <div style={{ padding: "20px 20px 0" }}>
+          {standingsLoading ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {[1,2,3,4,5,6].map(i => <div key={i} style={{ height: 52, borderRadius: 14, background: "var(--lp-surface)", border: "1px solid var(--lp-border)" }} />)}
+            </div>
+          ) : groups.length === 0 ? (
+            <div style={{ fontSize: 13, color: "var(--lp-text3)", padding: "20px 0" }}>Standings loading — tap a group to expand.</div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {groups.map((g, i) => <GroupTable key={i} group={g} />)}
+            </div>
           )}
         </div>
+      )}
 
-        {matchLoading ? (
-          <div style={{ padding: "0 20px", display: "flex", gap: 12 }}>
-            {[1, 2, 3].map((i) => (
-              <div key={i} style={{ minWidth: 220, height: 160, borderRadius: 16, background: "var(--lp-surface)", border: "1px solid var(--lp-border)", flexShrink: 0 }} />
-            ))}
-          </div>
-        ) : matchData?.error ? (
-          <div style={{ padding: "12px 20px" }}>
-            <div style={{ padding: "14px 16px", borderRadius: 12, background: "var(--lp-surface)", border: "1px solid var(--lp-border)", fontSize: 12, color: "var(--lp-text3)" }}>
-              <strong style={{ color: "var(--lp-text)" }}>Live scores unavailable</strong>
-              <br />Add <code>FOOTBALL_DATA_API_KEY</code> to your env to enable this.
+      {/* ── SCORERS ──────────────────────────────────────────────────────────── */}
+      {activeTab === "scorers" && (
+        <div style={{ padding: "20px 20px 0" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16, padding: "12px 16px", background: "color-mix(in srgb, #F5C518 8%, transparent)", border: "1px solid rgba(245,197,24,0.25)", borderRadius: 12 }}>
+            <span style={{ fontSize: 24 }}>🥇</span>
+            <div>
+              <div style={{ ...SG, fontSize: 13, fontWeight: 700, color: WC_GOLD }}>Golden Boot Race</div>
+              <div style={{ fontSize: 11, color: "var(--lp-text3)" }}>Top scorers — FIFA World Cup 2026</div>
             </div>
           </div>
-        ) : !hasMatches ? (
-          <div style={{ padding: "12px 20px", fontSize: 13, color: "var(--lp-text3)" }}>
-            No matches scheduled for today.
-          </div>
-        ) : (
-          <div style={{
-            display: "flex", gap: 12, overflowX: "auto",
-            padding: "0 20px 4px",
-            scrollbarWidth: "none",
-          }}>
-            {sortedMatches.map((match) => (
-              <MatchTile
-                key={match.id}
-                match={match}
-                onReadStory={handleReadStory}
-                generating={generatingId === match.id}
-              />
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* ── World Cup News ────────────────────────────────────────────────────── */}
-      <div style={{ padding: "32px 20px 0" }}>
-        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 14 }}>
-          <h2 style={{ ...SG, fontSize: 16, fontWeight: 700, margin: 0, color: "var(--lp-text)" }}>
-            WC Stories
-          </h2>
-          <span style={{ fontSize: 11, color: "var(--lp-text3)" }}>Auto-curated</span>
+          {scorersLoading ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+              {[1,2,3,4,5].map(i => <div key={i} style={{ height: 58, borderRadius: 8, background: "var(--lp-surface)" }} />)}
+            </div>
+          ) : scorers.length === 0 ? (
+            <div style={{ fontSize: 13, color: "var(--lp-text3)", padding: "20px 0" }}>No scorers yet — check back after matches are played.</div>
+          ) : scorers.map((s, i) => <ScorerRow key={s.player.id} scorer={s} rank={i + 1} />)}
         </div>
+      )}
 
+      {/* ── Stories ──────────────────────────────────────────────────────────── */}
+      <div style={{ padding: "28px 20px 0" }}>
+        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 14 }}>
+          <h2 style={{ ...SG, fontSize: 16, fontWeight: 700, margin: 0, color: "var(--lp-text)" }}>WC Stories</h2>
+          {news.length > 0 && <span style={{ fontSize: 11, color: "var(--lp-text3)" }}>{news.length} stories</span>}
+        </div>
         {newsLoading ? (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 12 }}>
-            {[1, 2, 3, 4].map((i) => (
-              <div key={i} style={{ height: 180, borderRadius: 14, background: "var(--lp-surface)", border: "1px solid var(--lp-border)" }} />
-            ))}
+            {[1,2,3,4,5,6].map(i => <div key={i} style={{ height: 190, borderRadius: 14, background: "var(--lp-surface)", border: "1px solid var(--lp-border)" }} />)}
           </div>
-        ) : !hasNews ? (
-          <div style={{ padding: "20px 0", textAlign: "center" }}>
-            <div style={{ fontSize: 12, color: "var(--lp-text3)", lineHeight: 1.6 }}>
-              Fetching the latest World Cup stories…
-              <br />
-              <span style={{ fontSize: 11 }}>This may take a moment on first load.</span>
-            </div>
+        ) : news.length === 0 ? (
+          <div style={{ padding: "20px 0", textAlign: "center", fontSize: 12, color: "var(--lp-text3)", lineHeight: 1.6 }}>
+            Fetching the latest World Cup stories…<br /><span style={{ fontSize: 11 }}>First load may take a moment.</span>
           </div>
         ) : (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 12 }}>
-            {news.map((story) => (
-              <NewsCard key={story.id} story={story} />
-            ))}
+            {news.map(s => <NewsCard key={s.id} story={s} />)}
           </div>
         )}
       </div>
