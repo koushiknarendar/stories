@@ -1,4 +1,5 @@
 export const runtime = "nodejs";
+export const revalidate = 86400; // cache for 24h at the CDN level
 
 import { ImageResponse } from "next/og";
 
@@ -193,6 +194,12 @@ export async function GET() {
         </div>
       </div>
     ),
-    { width: 1200, height: 630 }
+    {
+      width: 1200,
+      height: 630,
+      headers: {
+        "Cache-Control": "public, max-age=86400, immutable",
+      },
+    }
   );
 }
