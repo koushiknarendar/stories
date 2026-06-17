@@ -71,10 +71,10 @@ export default function DesktopNav() {
             const now = new Date();
             const wcEnd = new Date("2026-07-20T00:00:00Z");
             if (now >= wcEnd) return null;
-            const active = pathname === "/worldcup";
+            const active = pathname === "/fifa-worldcup-2026";
             return (
               <a
-                href="/worldcup"
+                href="/fifa-worldcup-2026"
                 style={{
                   display: "flex", alignItems: "center", gap: 14,
                   padding: "11px 14px", borderRadius: 10, textDecoration: "none",
