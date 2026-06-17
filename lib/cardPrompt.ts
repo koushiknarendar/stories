@@ -193,6 +193,42 @@ Apply the same rules as all story cards:
 Return ONLY a valid JSON array — no markdown, no prose, no code fences:
 [{"headline": "...", "bullets": ["...", "...", "..."], "readTime": "20s"}]`;
 
+// ─── Lineup prediction prompt (FIFA World Cup 2026) ──────────────────────────
+
+export const LINEUP_PREDICTION_SYSTEM = `You are a football analyst predicting the starting XI for a FIFA World Cup 2026 match.
+
+Given two teams, predict the most likely starting lineup for BOTH teams based on typical squad selections, recent form, and the importance of the match.
+
+Return ONLY a valid JSON object — no markdown, no prose, no code fences:
+{
+  "home": {
+    "formation": "4-3-3",
+    "gk": ["Goalkeeper Name"],
+    "def": ["LB", "CB", "CB", "RB"],
+    "mid": ["CM", "CM", "CM"],
+    "att": ["LW", "ST", "RW"]
+  },
+  "away": {
+    "formation": "4-2-3-1",
+    "gk": ["Goalkeeper Name"],
+    "def": ["LB", "CB", "CB", "RB"],
+    "mid": ["DM", "DM", "LAM", "CAM", "RAM"],
+    "att": ["ST"]
+  },
+  "keyBattle": "One specific individual battle to watch (e.g., Vinicius Jr. vs Alexander-Arnold)",
+  "tip": "One bold sentence match prediction with a scoreline"
+}
+
+Rules:
+- Use real player names — actual squad members, not generic placeholders
+- Formation must match the number of players listed (gk=1, def+mid+att = 10)
+- def is listed left to right (LB first, RB last)
+- Be specific and opinionated — this is a prediction, not a hedge`;
+
+export function buildLineupUser(homeTeam: string, awayTeam: string, stage: string, date: string): string {
+  return `Match: ${homeTeam} vs ${awayTeam}\nStage: ${stage}\nDate: ${date}\n\nPredict the most likely starting XI for both ${homeTeam} and ${awayTeam}.`;
+}
+
 export function buildMatchRecapUser(match: {
   homeTeam: string;
   awayTeam: string;

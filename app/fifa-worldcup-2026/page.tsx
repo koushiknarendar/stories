@@ -8,10 +8,9 @@ import BottomNav from "@/components/BottomNav";
 const SG: React.CSSProperties = { fontFamily: "var(--font-space, 'Space Grotesk', sans-serif)" };
 const WC_GOLD = "#F5C518";
 const WC_BLUE = "#004C97";
-
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
-// ─── football-data.org Types ──────────────────────────────────────────────────
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface FDTeam { id: number; name: string; shortName: string; tla: string; crest: string; }
 interface FDGoal { minute: number; team: { name: string }; scorer: { name: string }; type: string; }
@@ -39,6 +38,8 @@ interface NewsStory {
   id: string; title: string; source: string; source_url: string | null;
   cover_image_url: string | null; saved_at: string; published_at?: string | null;
 }
+interface LineupTeam { formation: string; gk: string[]; def: string[]; mid: string[]; att: string[]; }
+interface LineupData { home: LineupTeam; away: LineupTeam; keyBattle: string; tip: string; }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -65,15 +66,140 @@ function timeAgo(iso: string) {
   if (h < 24) return `${h}h ago`; return `${Math.floor(h / 24)}d ago`;
 }
 
-// ─── MatchTile ────────────────────────────────────────────────────────────────
+// ─── Pitch display ────────────────────────────────────────────────────────────
+
+function PitchRow({ players, color }: { players: string[]; color: string }) {
+  return (
+    <div style={{ display: "flex", justifyContent: "space-around", gap: 4, padding: "6px 8px" }}>
+      {players.map((name, i) => (
+        <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, flex: 1, minWidth: 0 }}>
+          <div style={{ width: 32, height: 32, borderRadius: "50%", background: color, border: "2px solid rgba(255,255,255,0.9)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <span style={{ fontSize: 9, fontWeight: 800, color: "#fff" }}>{name.split(" ").pop()?.slice(0, 3).toUpperCase()}</span>
+          </div>
+          <span style={{ fontSize: 9, color: "#fff", textAlign: "center", lineHeight: 1.2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 52 }}>{name.split(" ").pop()}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function Pitch({ lineup, homeTeam, awayTeam }: { lineup: LineupData; homeTeam: string; awayTeam: string }) {
+  const HOME_COLOR = WC_BLUE;
+  const AWAY_COLOR = "#c0392b";
+
+  return (
+    <div style={{ borderRadius: 14, overflow: "hidden", background: "#2d6a2d", position: "relative" }}>
+      {/* Field markings */}
+      <div style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
+        {/* Center line */}
+        <div style={{ position: "absolute", top: "50%", left: "5%", right: "5%", height: 1, background: "rgba(255,255,255,0.2)" }} />
+        {/* Center circle */}
+        <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: 60, height: 60, borderRadius: "50%", border: "1px solid rgba(255,255,255,0.15)" }} />
+      </div>
+
+      {/* Home team (top) */}
+      <div style={{ padding: "10px 4px 4px" }}>
+        <div style={{ ...SG, fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.6)", textAlign: "center", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 4 }}>
+          {homeTeam} · {lineup.home.formation}
+        </div>
+        <PitchRow players={lineup.home.att} color={HOME_COLOR} />
+        {lineup.home.mid.length > 0 && <PitchRow players={lineup.home.mid} color={HOME_COLOR} />}
+        <PitchRow players={lineup.home.def} color={HOME_COLOR} />
+        <PitchRow players={lineup.home.gk} color="#1a4a8a" />
+      </div>
+
+      {/* Center divider */}
+      <div style={{ height: 1, background: "rgba(255,255,255,0.15)", margin: "4px 12px" }} />
+
+      {/* Away team (bottom) */}
+      <div style={{ padding: "4px 4px 10px" }}>
+        <PitchRow players={lineup.away.gk} color="#8b1a1a" />
+        <PitchRow players={lineup.away.def} color={AWAY_COLOR} />
+        {lineup.away.mid.length > 0 && <PitchRow players={lineup.away.mid} color={AWAY_COLOR} />}
+        <PitchRow players={lineup.away.att} color={AWAY_COLOR} />
+        <div style={{ ...SG, fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.6)", textAlign: "center", letterSpacing: "0.08em", textTransform: "uppercase", marginTop: 4 }}>
+          {awayTeam} · {lineup.away.formation}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Lineup Modal ─────────────────────────────────────────────────────────────
+
+function LineupModal({ match, data, onClose }: {
+  match: FDMatch; data: LineupData; onClose: () => void;
+}) {
+  const dateStr = new Date(match.utcDate).toLocaleDateString([], { weekday: "long", month: "short", day: "numeric" });
+  const timeStr = new Date(match.utcDate).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
+  return (
+    <div
+      onClick={onClose}
+      style={{ position: "fixed", inset: 0, zIndex: 100, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(6px)", display: "flex", alignItems: "flex-end" }}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{ width: "100%", maxHeight: "90dvh", overflowY: "auto", background: "var(--lp-bg)", borderRadius: "20px 20px 0 0", padding: "0 0 calc(env(safe-area-inset-bottom, 0px) + 24px)" }}
+      >
+        {/* Handle */}
+        <div style={{ display: "flex", justifyContent: "center", padding: "12px 0 4px" }}>
+          <div style={{ width: 36, height: 4, borderRadius: 2, background: "var(--lp-border)" }} />
+        </div>
+
+        {/* Header */}
+        <div style={{ padding: "12px 20px 16px", borderBottom: "1px solid var(--lp-border)" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div>
+              <div style={{ ...SG, fontSize: 11, fontWeight: 700, color: WC_GOLD, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 4 }}>
+                ⚡ Predicted Lineup
+              </div>
+              <div style={{ ...SG, fontSize: 18, fontWeight: 800, color: "var(--lp-text)", lineHeight: 1.15 }}>
+                {match.homeTeam.shortName} vs {match.awayTeam.shortName}
+              </div>
+              <div style={{ fontSize: 12, color: "var(--lp-text3)", marginTop: 2 }}>
+                {stageLabel(match.stage, match.group)} · {dateStr} · {timeStr}
+              </div>
+            </div>
+            <button onClick={onClose} style={{ background: "var(--lp-surface)", border: "1px solid var(--lp-border)", borderRadius: 8, padding: "6px 10px", cursor: "pointer", color: "var(--lp-text2)", fontSize: 13 }}>✕</button>
+          </div>
+        </div>
+
+        {/* Pitch */}
+        <div style={{ padding: "16px 16px 0" }}>
+          <Pitch lineup={data} homeTeam={match.homeTeam.shortName} awayTeam={match.awayTeam.shortName} />
+        </div>
+
+        {/* Key battle */}
+        <div style={{ margin: "16px 16px 0", padding: "12px 14px", background: "var(--lp-surface)", border: "1px solid var(--lp-border)", borderRadius: 12 }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: "var(--lp-text3)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>⚔️ Key Battle</div>
+          <p style={{ ...SG, fontSize: 13, fontWeight: 600, color: "var(--lp-text)", margin: 0, lineHeight: 1.4 }}>{data.keyBattle}</p>
+        </div>
+
+        {/* Prediction tip */}
+        <div style={{ margin: "12px 16px 0", padding: "12px 14px", background: `linear-gradient(135deg, color-mix(in srgb, ${WC_GOLD} 8%, transparent), color-mix(in srgb, ${WC_GOLD} 3%, transparent))`, border: `1px solid rgba(245,197,24,0.2)`, borderRadius: 12 }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: WC_GOLD, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>🎯 Prediction</div>
+          <p style={{ ...SG, fontSize: 13, fontWeight: 600, color: "var(--lp-text)", margin: 0, lineHeight: 1.4 }}>{data.tip}</p>
+        </div>
+
+        {/* Disclaimer */}
+        <p style={{ fontSize: 10, color: "var(--lp-text3)", textAlign: "center", margin: "12px 20px 0", lineHeight: 1.5 }}>
+          AI-generated prediction · Based on known squads and typical formations · Subject to injuries and rotation
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// ─── MatchTile (finished) ─────────────────────────────────────────────────────
 
 function MatchTile({ match, onReadStory, generating }: {
   match: FDMatch; onReadStory: (m: FDMatch) => void; generating: boolean;
 }) {
   const isFinished = match.status === "FINISHED";
   const isLive = match.status === "IN_PLAY" || match.status === "PAUSED";
-  const hGoals = isFinished || isLive ? goalList(match.goals ?? [], match.homeTeam.name) : [];
-  const aGoals = isFinished || isLive ? goalList(match.goals ?? [], match.awayTeam.name) : [];
+  const hGoals = goalList(match.goals ?? [], match.homeTeam.name);
+  const aGoals = goalList(match.goals ?? [], match.awayTeam.name);
 
   return (
     <div style={{ minWidth: 230, maxWidth: 250, flexShrink: 0, background: "var(--lp-surface)", border: `1px solid ${isLive ? "rgba(229,62,62,0.4)" : "var(--lp-border)"}`, borderRadius: 16, padding: "14px 16px 12px", display: "flex", flexDirection: "column", gap: 10 }}>
@@ -81,54 +207,80 @@ function MatchTile({ match, onReadStory, generating }: {
         <span style={{ fontSize: 10, fontWeight: 600, color: "var(--lp-text3)", letterSpacing: "0.05em", textTransform: "uppercase" }}>
           {stageLabel(match.stage, match.group)}
         </span>
-        {isLive ? (
-          <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10, fontWeight: 700, color: "#e53e3e" }}>
-            <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#e53e3e", animation: "wc-pulse 1.2s ease-in-out infinite" }} />LIVE
-          </span>
-        ) : isFinished ? (
-          <span style={{ fontSize: 10, fontWeight: 600, color: "var(--lp-text3)" }}>FT</span>
-        ) : (
-          <span style={{ fontSize: 10, fontWeight: 600, color: "var(--lp-text3)" }}>
-            {new Date(match.utcDate).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-          </span>
-        )}
+        {isLive
+          ? <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10, fontWeight: 700, color: "#e53e3e" }}><span style={{ width: 6, height: 6, borderRadius: "50%", background: "#e53e3e", animation: "wc-pulse 1.2s ease-in-out infinite" }} />LIVE</span>
+          : <span style={{ fontSize: 10, fontWeight: 600, color: "var(--lp-text3)" }}>FT</span>}
       </div>
 
       {[
         { team: match.homeTeam, goals: hGoals, score: match.score.fullTime.home },
         { team: match.awayTeam, goals: aGoals, score: match.score.fullTime.away }
-      ].map(({ team, goals, score }, idx) => (
-        <div key={idx} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+      ].map(({ team, goals, score }, i) => (
+        <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
           <div style={{ minWidth: 0 }}>
             <div style={{ ...SG, fontSize: 13, fontWeight: 700, color: "var(--lp-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{team.shortName || team.name}</div>
             {goals.length > 0 && <div style={{ fontSize: 9, color: "var(--lp-text3)", lineHeight: 1.3 }}>{goals.join(", ")}</div>}
           </div>
-          <span style={{ ...SG, fontSize: 22, fontWeight: 800, color: isFinished || isLive ? "var(--lp-text)" : "var(--lp-text3)", minWidth: 18, textAlign: "right" }}>
-            {isFinished || isLive ? (score ?? 0) : "–"}
-          </span>
+          <span style={{ ...SG, fontSize: 22, fontWeight: 800, color: "var(--lp-text)", minWidth: 18, textAlign: "right" }}>{score ?? 0}</span>
         </div>
       ))}
 
-      <div style={{ marginTop: 2 }}>
-        {isFinished ? (
-          <button
-            onClick={() => onReadStory(match)}
-            disabled={generating}
-            style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "none", background: generating ? "var(--lp-border)" : WC_BLUE, color: generating ? "var(--lp-text3)" : "#fff", ...SG, fontSize: 12, fontWeight: 700, cursor: generating ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}
-          >
-            {generating
-              ? <><span style={{ width: 10, height: 10, borderRadius: "50%", border: "2px solid var(--lp-text3)", borderTopColor: "transparent", animation: "wc-spin .7s linear infinite", display: "inline-block" }} />Generating…</>
-              : "Read Story ⚡"}
-          </button>
-        ) : isLive ? (
-          <div style={{ textAlign: "center", fontSize: 11, fontWeight: 700, color: "#e53e3e" }}>In Progress</div>
-        ) : (
-          <div style={{ textAlign: "center", fontSize: 11, color: "var(--lp-text3)" }}>
-            {new Date(match.utcDate).toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" })}
-            {" · "}{new Date(match.utcDate).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-          </div>
-        )}
+      <button
+        onClick={() => onReadStory(match)}
+        disabled={generating}
+        style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "none", background: generating ? "var(--lp-border)" : WC_BLUE, color: generating ? "var(--lp-text3)" : "#fff", ...SG, fontSize: 12, fontWeight: 700, cursor: generating ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}
+      >
+        {generating
+          ? <><span style={{ width: 10, height: 10, borderRadius: "50%", border: "2px solid var(--lp-text3)", borderTopColor: "transparent", animation: "wc-spin .7s linear infinite", display: "inline-block" }} />Generating…</>
+          : "Read Story ⚡"}
+      </button>
+    </div>
+  );
+}
+
+// ─── UpcomingTile ─────────────────────────────────────────────────────────────
+
+function UpcomingTile({ match, onPredict, predicting }: {
+  match: FDMatch; onPredict: (m: FDMatch) => void; predicting: boolean;
+}) {
+  const d = new Date(match.utcDate);
+  const isToday = fmt(d) === fmt(new Date());
+  const dayLabel = isToday ? "Today" : d.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" });
+  const timeStr = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
+  return (
+    <div style={{ background: "var(--lp-surface)", border: "1px solid var(--lp-border)", borderRadius: 16, padding: "14px 16px", display: "flex", flexDirection: "column", gap: 12 }}>
+      {/* Stage + datetime */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <span style={{ fontSize: 10, fontWeight: 600, color: "var(--lp-text3)", letterSpacing: "0.05em", textTransform: "uppercase" }}>
+          {stageLabel(match.stage, match.group)}
+        </span>
+        <span style={{ ...SG, fontSize: 11, fontWeight: 700, color: isToday ? WC_GOLD : "var(--lp-text2)" }}>
+          {dayLabel} · {timeStr}
+        </span>
       </div>
+
+      {/* Teams vs */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <div style={{ flex: 1, ...SG, fontSize: 15, fontWeight: 800, color: "var(--lp-text)", textAlign: "right", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {match.homeTeam.shortName || match.homeTeam.name}
+        </div>
+        <div style={{ ...SG, fontSize: 11, fontWeight: 700, color: "var(--lp-text3)", flexShrink: 0, padding: "4px 10px", background: "var(--lp-page-bg)", borderRadius: 8 }}>vs</div>
+        <div style={{ flex: 1, ...SG, fontSize: 15, fontWeight: 800, color: "var(--lp-text)", textAlign: "left", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {match.awayTeam.shortName || match.awayTeam.name}
+        </div>
+      </div>
+
+      {/* Predict CTA */}
+      <button
+        onClick={() => onPredict(match)}
+        disabled={predicting}
+        style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: `1.5px solid ${predicting ? "var(--lp-border)" : WC_GOLD}`, background: predicting ? "var(--lp-border)" : "color-mix(in srgb, #F5C518 10%, transparent)", color: predicting ? "var(--lp-text3)" : WC_GOLD, ...SG, fontSize: 13, fontWeight: 700, cursor: predicting ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 7, transition: "all .15s" }}
+      >
+        {predicting
+          ? <><span style={{ width: 11, height: 11, borderRadius: "50%", border: `2px solid var(--lp-text3)`, borderTopColor: "transparent", animation: "wc-spin .7s linear infinite", display: "inline-block" }} />Predicting lineup…</>
+          : <><span style={{ fontSize: 15 }}>⚡</span> Predict Lineup</>}
+      </button>
     </div>
   );
 }
@@ -141,17 +293,12 @@ function GroupTable({ group }: { group: FDGroup }) {
 
   return (
     <div style={{ background: "var(--lp-surface)", border: "1px solid var(--lp-border)", borderRadius: 14, overflow: "hidden" }}>
-      <button
-        onClick={() => setOpen(v => !v)}
-        style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", background: "transparent", border: "none", cursor: "pointer", color: "var(--lp-text)" }}
-      >
+      <button onClick={() => setOpen(v => !v)} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", background: "transparent", border: "none", cursor: "pointer", color: "var(--lp-text)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <span style={{ ...SG, fontSize: 13, fontWeight: 700 }}>{label}</span>
-          {group.table.length > 0 && (
-            <span style={{ fontSize: 11, color: "var(--lp-text3)" }}>
-              {group.table[0]?.team.tla} · {group.table[1]?.team.tla} · {group.table[2]?.team.tla} · {group.table[3]?.team.tla}
-            </span>
-          )}
+          <span style={{ fontSize: 11, color: "var(--lp-text3)" }}>
+            {group.table.slice(0, 4).map(r => r.team.tla).join(" · ")}
+          </span>
         </div>
         <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform .2s", color: "var(--lp-text3)", flexShrink: 0 }}>
           <path d="M6 9l6 6 6-6" />
@@ -240,53 +387,52 @@ function NewsCard({ story }: { story: NewsStory }) {
 
 export default function WorldCupPage() {
   const router = useRouter();
-  const [generatingId, setGeneratingId] = useState<number | null>(null);
-  const [genError, setGenError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"matches" | "standings" | "scorers">("matches");
+  const [generatingId, setGeneratingId]   = useState<number | null>(null);
+  const [predictingId, setPredictingId]   = useState<number | null>(null);
+  const [genError, setGenError]           = useState<string | null>(null);
+  const [lineupModal, setLineupModal]     = useState<{ match: FDMatch; data: LineupData } | null>(null);
+  const [activeTab, setActiveTab]         = useState<"matches" | "upcoming" | "standings" | "scorers">("matches");
 
   const today = new Date();
-  const dateFrom = fmt(new Date(today.getTime() - 2 * 86_400_000));
-  const dateTo   = fmt(new Date(today.getTime() + 2 * 86_400_000));
+  // Recent matches: -2 days to today
+  const recentFrom = fmt(new Date(today.getTime() - 2 * 86_400_000));
+  const recentTo   = fmt(today);
+  // Upcoming matches: tomorrow to +7 days
+  const upcomingFrom = fmt(new Date(today.getTime() + 86_400_000));
+  const upcomingTo   = fmt(new Date(today.getTime() + 7 * 86_400_000));
 
-  const { data: matchData, isLoading: matchLoading } = useSWR(
-    `/api/worldcup?dateFrom=${dateFrom}&dateTo=${dateTo}`, fetcher, { refreshInterval: 60_000 }
-  );
-  const { data: standingsData, isLoading: standingsLoading } = useSWR(
-    activeTab === "standings" ? "/api/worldcup/standings" : null, fetcher
-  );
-  const { data: scorersData, isLoading: scorersLoading } = useSWR(
-    activeTab === "scorers" ? "/api/worldcup/scorers" : null, fetcher
-  );
-  const { data: newsData, isLoading: newsLoading } = useSWR("/api/worldcup/news", fetcher);
+  const { data: matchData,    isLoading: matchLoading }    = useSWR(`/api/worldcup?dateFrom=${recentFrom}&dateTo=${recentTo}`, fetcher, { refreshInterval: 60_000 });
+  const { data: upcomingData, isLoading: upcomingLoading } = useSWR(activeTab === "upcoming" ? `/api/worldcup?dateFrom=${upcomingFrom}&dateTo=${upcomingTo}` : null, fetcher, { refreshInterval: 300_000 });
+  const { data: standingsData, isLoading: standingsLoading } = useSWR(activeTab === "standings" ? "/api/worldcup/standings" : null, fetcher);
+  const { data: scorersData,  isLoading: scorersLoading }  = useSWR(activeTab === "scorers" ? "/api/worldcup/scorers" : null, fetcher);
+  const { data: newsData,     isLoading: newsLoading }     = useSWR("/api/worldcup/news", fetcher);
 
-  const matches: FDMatch[] = Array.isArray(matchData?.matches) ? matchData.matches : [];
-  const groups: FDGroup[] = Array.isArray(standingsData?.standings)
-    ? standingsData.standings.filter((g: FDGroup) => g.type === "TOTAL") : [];
+  const recentMatches: FDMatch[]  = Array.isArray(matchData?.matches) ? matchData.matches.filter((m: FDMatch) => m.status === "FINISHED" || m.status === "IN_PLAY" || m.status === "PAUSED") : [];
+  const upcomingMatches: FDMatch[] = Array.isArray(upcomingData?.matches)
+    ? [...upcomingData.matches].filter((m: FDMatch) => m.status === "TIMED" || m.status === "SCHEDULED").sort((a: FDMatch, b: FDMatch) => new Date(a.utcDate).getTime() - new Date(b.utcDate).getTime())
+    : [];
+  const groups: FDGroup[]  = Array.isArray(standingsData?.standings) ? standingsData.standings.filter((g: FDGroup) => g.type === "TOTAL") : [];
   const scorers: FDScorer[] = Array.isArray(scorersData?.scorers) ? scorersData.scorers : [];
-  const news: NewsStory[] = Array.isArray(newsData?.stories) ? newsData.stories : [];
+  const news: NewsStory[]  = Array.isArray(newsData?.stories) ? newsData.stories : [];
 
-  const sortedMatches = [...matches].sort((a, b) => {
-    const p = (m: FDMatch) => m.status === "IN_PLAY" || m.status === "PAUSED" ? 0 : m.status === "FINISHED" ? 1 : 2;
+  const sortedRecent = [...recentMatches].sort((a, b) => {
+    const p = (m: FDMatch) => m.status === "IN_PLAY" || m.status === "PAUSED" ? 0 : 1;
     const pd = p(a) - p(b);
     if (pd !== 0) return pd;
-    if (a.status === "FINISHED") return new Date(b.utcDate).getTime() - new Date(a.utcDate).getTime();
-    return new Date(a.utcDate).getTime() - new Date(b.utcDate).getTime();
+    return new Date(b.utcDate).getTime() - new Date(a.utcDate).getTime();
   });
 
-  const liveCount     = matches.filter(m => m.status === "IN_PLAY" || m.status === "PAUSED").length;
-  const finishedCount = matches.filter(m => m.status === "FINISHED").length;
-  const upcomingCount = matches.length - finishedCount - liveCount;
+  const liveCount     = recentMatches.filter(m => m.status === "IN_PLAY" || m.status === "PAUSED").length;
+  const finishedCount = recentMatches.filter(m => m.status === "FINISHED").length;
 
   async function handleReadStory(match: FDMatch) {
     setGenError(null);
     setGeneratingId(match.id);
     try {
       const res = await fetch("/api/worldcup/recap", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+        method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          matchId: match.id,
-          homeTeam: match.homeTeam.name, awayTeam: match.awayTeam.name,
+          matchId: match.id, homeTeam: match.homeTeam.name, awayTeam: match.awayTeam.name,
           homeScore: match.score.fullTime.home ?? 0, awayScore: match.score.fullTime.away ?? 0,
           stage: stageLabel(match.stage, match.group), date: match.utcDate,
           goals: allGoals(match.goals ?? []), group: match.group ?? undefined,
@@ -301,10 +447,32 @@ export default function WorldCupPage() {
     }
   }
 
+  async function handlePredictLineup(match: FDMatch) {
+    setGenError(null);
+    setPredictingId(match.id);
+    try {
+      const res = await fetch("/api/worldcup/lineup", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          homeTeam: match.homeTeam.name, awayTeam: match.awayTeam.name,
+          stage: stageLabel(match.stage, match.group), date: match.utcDate,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.home) throw new Error(data.error ?? "Failed to predict lineup");
+      setLineupModal({ match, data });
+    } catch (err) {
+      setGenError(err instanceof Error ? err.message : "Something went wrong");
+    } finally {
+      setPredictingId(null);
+    }
+  }
+
   const TABS = [
-    { key: "matches" as const,   label: "Matches" },
+    { key: "matches" as const,   label: "Results" },
+    { key: "upcoming" as const,  label: "Upcoming" },
     { key: "standings" as const, label: "Standings" },
-    { key: "scorers" as const,   label: "Top Scorers" },
+    { key: "scorers" as const,   label: "Scorers" },
   ];
 
   return (
@@ -314,11 +482,14 @@ export default function WorldCupPage() {
         @keyframes wc-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
       `}</style>
 
+      {/* Lineup modal */}
+      {lineupModal && (
+        <LineupModal match={lineupModal.match} data={lineupModal.data} onClose={() => setLineupModal(null)} />
+      )}
+
       {/* ── Hero ─────────────────────────────────────────────────────────────── */}
       <div style={{ background: `linear-gradient(145deg, ${WC_BLUE} 0%, #002D62 55%, #001025 100%)`, padding: "calc(env(safe-area-inset-top, 0px) + 28px) 20px 0", position: "relative", overflow: "hidden" }}>
         <div style={{ position: "absolute", top: -60, right: -60, width: 280, height: 280, borderRadius: "50%", background: "rgba(245,197,24,0.07)", pointerEvents: "none" }} />
-        <div style={{ position: "absolute", bottom: 20, left: -40, width: 180, height: 180, borderRadius: "50%", background: "rgba(255,255,255,0.03)", pointerEvents: "none" }} />
-
         <div style={{ position: "relative" }}>
           <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 10 }}>
             <div>
@@ -335,24 +506,22 @@ export default function WorldCupPage() {
           </div>
 
           {/* Stats strip */}
-          {matches.length > 0 && (
-            <div style={{ display: "flex", marginBottom: 18 }}>
-              {[{ v: finishedCount, l: "Played" }, { v: liveCount, l: "Live" }, { v: upcomingCount, l: "Upcoming" }].map(({ v, l }, i) => (
-                <div key={i} style={{ flex: 1, textAlign: "center", padding: "10px 4px", borderRight: i < 2 ? "1px solid rgba(255,255,255,0.1)" : "none" }}>
-                  <div style={{ ...SG, fontSize: 22, fontWeight: 800, color: "#fff" }}>{v}</div>
-                  <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "0.06em" }}>{l}</div>
-                </div>
-              ))}
-            </div>
-          )}
+          <div style={{ display: "flex", marginBottom: 18 }}>
+            {[{ v: finishedCount, l: "Results" }, { v: liveCount, l: "Live" }, { v: upcomingMatches.length || "—", l: "Upcoming" }].map(({ v, l }, i) => (
+              <div key={i} style={{ flex: 1, textAlign: "center", padding: "10px 4px", borderRight: i < 2 ? "1px solid rgba(255,255,255,0.1)" : "none" }}>
+                <div style={{ ...SG, fontSize: 22, fontWeight: 800, color: "#fff" }}>{v}</div>
+                <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "0.06em" }}>{l}</div>
+              </div>
+            ))}
+          </div>
 
           {/* Tabs */}
-          <div style={{ display: "flex", borderTop: "1px solid rgba(255,255,255,0.1)" }}>
+          <div style={{ display: "flex", borderTop: "1px solid rgba(255,255,255,0.1)", overflowX: "auto", scrollbarWidth: "none" }}>
             {TABS.map(t => (
               <button
                 key={t.key}
                 onClick={() => setActiveTab(t.key)}
-                style={{ flex: 1, padding: "12px 4px", background: "transparent", border: "none", cursor: "pointer", ...SG, fontSize: 13, fontWeight: activeTab === t.key ? 700 : 500, color: activeTab === t.key ? WC_GOLD : "rgba(255,255,255,0.45)", borderBottom: `2px solid ${activeTab === t.key ? WC_GOLD : "transparent"}`, transition: "all .15s" }}
+                style={{ flex: 1, minWidth: 70, padding: "12px 4px", background: "transparent", border: "none", cursor: "pointer", ...SG, fontSize: 12, fontWeight: activeTab === t.key ? 700 : 500, color: activeTab === t.key ? WC_GOLD : "rgba(255,255,255,0.45)", borderBottom: `2px solid ${activeTab === t.key ? WC_GOLD : "transparent"}`, transition: "all .15s", whiteSpace: "nowrap" }}
               >
                 {t.label}
               </button>
@@ -361,35 +530,81 @@ export default function WorldCupPage() {
         </div>
       </div>
 
-      {/* Error */}
       {genError && (
         <div style={{ margin: "12px 16px 0", padding: "10px 14px", borderRadius: 10, background: "rgba(229,62,62,0.12)", border: "1px solid rgba(229,62,62,0.3)", fontSize: 12, color: "#e53e3e" }}>{genError}</div>
       )}
 
-      {/* ── MATCHES ──────────────────────────────────────────────────────────── */}
+      {/* ── RESULTS ──────────────────────────────────────────────────────────── */}
       {activeTab === "matches" && (
         <div style={{ paddingTop: 20 }}>
           {matchLoading ? (
             <div style={{ padding: "0 20px", display: "flex", gap: 12 }}>
               {[1,2,3].map(i => <div key={i} style={{ minWidth: 230, height: 170, borderRadius: 16, background: "var(--lp-surface)", border: "1px solid var(--lp-border)", flexShrink: 0 }} />)}
             </div>
-          ) : matchData?.error ? (
-            <div style={{ padding: "12px 20px" }}>
-              <div style={{ padding: "14px 16px", borderRadius: 12, background: "var(--lp-surface)", border: "1px solid var(--lp-border)", fontSize: 12, color: "var(--lp-text3)" }}>
-                <strong style={{ color: "var(--lp-text)" }}>Live scores unavailable.</strong> Check your <code>FOOTBALL_DATA_API_KEY</code>.
-              </div>
-            </div>
-          ) : sortedMatches.length === 0 ? (
-            <div style={{ padding: "20px", fontSize: 13, color: "var(--lp-text3)" }}>No matches in this window.</div>
+          ) : sortedRecent.length === 0 ? (
+            <div style={{ padding: "20px", fontSize: 13, color: "var(--lp-text3)" }}>No recent results. Check the Upcoming tab.</div>
           ) : (
             <div style={{ display: "flex", gap: 12, overflowX: "auto", padding: "0 20px 4px", scrollbarWidth: "none" }}>
-              {sortedMatches.map(m => (
+              {sortedRecent.map(m => (
                 <MatchTile key={m.id} match={m} onReadStory={handleReadStory} generating={generatingId === m.id} />
               ))}
             </div>
           )}
-          <p style={{ fontSize: 11, color: "var(--lp-text3)", margin: "8px 20px 0" }}>
-            Showing ±2 days · Tap any finished match for a 5-card AI story
+          <p style={{ fontSize: 11, color: "var(--lp-text3)", margin: "8px 20px 0" }}>Last 2 days · Tap finished matches for an AI story recap</p>
+        </div>
+      )}
+
+      {/* ── UPCOMING ─────────────────────────────────────────────────────────── */}
+      {activeTab === "upcoming" && (
+        <div style={{ padding: "20px 16px 0" }}>
+          {/* Today's scheduled matches first */}
+          {(() => {
+            const todayMatches = (matchData?.matches ?? []).filter((m: FDMatch) => m.status === "TIMED" || m.status === "SCHEDULED");
+            if (todayMatches.length > 0) return (
+              <div style={{ marginBottom: 20 }}>
+                <div style={{ ...SG, fontSize: 11, fontWeight: 700, color: WC_GOLD, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 10 }}>Today</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  {todayMatches.map((m: FDMatch) => (
+                    <UpcomingTile key={m.id} match={m} onPredict={handlePredictLineup} predicting={predictingId === m.id} />
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Rest of upcoming week */}
+          {upcomingLoading ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {[1,2,3,4].map(i => <div key={i} style={{ height: 120, borderRadius: 16, background: "var(--lp-surface)", border: "1px solid var(--lp-border)" }} />)}
+            </div>
+          ) : upcomingMatches.length === 0 ? (
+            <div style={{ fontSize: 13, color: "var(--lp-text3)", padding: "20px 4px" }}>No upcoming matches in the next 7 days.</div>
+          ) : (
+            (() => {
+              // Group by date
+              const byDate: Record<string, FDMatch[]> = {};
+              for (const m of upcomingMatches) {
+                const day = fmt(new Date(m.utcDate));
+                if (!byDate[day]) byDate[day] = [];
+                byDate[day].push(m);
+              }
+              return Object.entries(byDate).map(([day, matches]) => (
+                <div key={day} style={{ marginBottom: 20 }}>
+                  <div style={{ ...SG, fontSize: 11, fontWeight: 700, color: "var(--lp-text3)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 10 }}>
+                    {new Date(day + "T12:00:00").toLocaleDateString([], { weekday: "long", month: "short", day: "numeric" })}
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    {matches.map(m => (
+                      <UpcomingTile key={m.id} match={m} onPredict={handlePredictLineup} predicting={predictingId === m.id} />
+                    ))}
+                  </div>
+                </div>
+              ));
+            })()
+          )}
+
+          <p style={{ fontSize: 11, color: "var(--lp-text3)", margin: "4px 4px 0" }}>
+            ⚡ Lineup Prediction uses AI — not official team announcements
           </p>
         </div>
       )}
@@ -402,7 +617,7 @@ export default function WorldCupPage() {
               {[1,2,3,4,5,6].map(i => <div key={i} style={{ height: 52, borderRadius: 14, background: "var(--lp-surface)", border: "1px solid var(--lp-border)" }} />)}
             </div>
           ) : groups.length === 0 ? (
-            <div style={{ fontSize: 13, color: "var(--lp-text3)", padding: "20px 0" }}>Standings loading — tap a group to expand.</div>
+            <div style={{ fontSize: 13, color: "var(--lp-text3)", padding: "20px 0" }}>Standings loading.</div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {groups.map((g, i) => <GroupTable key={i} group={g} />)}
@@ -421,13 +636,11 @@ export default function WorldCupPage() {
               <div style={{ fontSize: 11, color: "var(--lp-text3)" }}>Top scorers — FIFA World Cup 2026</div>
             </div>
           </div>
-          {scorersLoading ? (
-            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-              {[1,2,3,4,5].map(i => <div key={i} style={{ height: 58, borderRadius: 8, background: "var(--lp-surface)" }} />)}
-            </div>
-          ) : scorers.length === 0 ? (
-            <div style={{ fontSize: 13, color: "var(--lp-text3)", padding: "20px 0" }}>No scorers yet — check back after matches are played.</div>
-          ) : scorers.map((s, i) => <ScorerRow key={s.player.id} scorer={s} rank={i + 1} />)}
+          {scorersLoading
+            ? [1,2,3,4,5].map(i => <div key={i} style={{ height: 58, borderRadius: 8, background: "var(--lp-surface)", marginBottom: 4 }} />)
+            : scorers.length === 0
+            ? <div style={{ fontSize: 13, color: "var(--lp-text3)", padding: "20px 0" }}>No scorers yet.</div>
+            : scorers.map((s, i) => <ScorerRow key={s.player.id} scorer={s} rank={i + 1} />)}
         </div>
       )}
 
@@ -443,7 +656,7 @@ export default function WorldCupPage() {
           </div>
         ) : news.length === 0 ? (
           <div style={{ padding: "20px 0", textAlign: "center", fontSize: 12, color: "var(--lp-text3)", lineHeight: 1.6 }}>
-            Fetching the latest World Cup stories…<br /><span style={{ fontSize: 11 }}>First load may take a moment.</span>
+            Fetching World Cup stories…<br /><span style={{ fontSize: 11 }}>First load may take a moment.</span>
           </div>
         ) : (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 12 }}>
