@@ -62,6 +62,18 @@ function timeAgo(iso: string) {
   return `${Math.floor(h / 24)}d ago`;
 }
 
+function getDateLabel(iso: string): string {
+  const d = new Date(iso);
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const itemDay = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const diffDays = Math.round((today.getTime() - itemDay.getTime()) / 86400000);
+  if (diffDays === 0) return "Today";
+  if (diffDays === 1) return "Yesterday";
+  if (diffDays < 7) return d.toLocaleDateString("en-US", { weekday: "long" });
+  return d.toLocaleDateString("en-US", { month: "long", day: "numeric", ...(d.getFullYear() !== now.getFullYear() ? { year: "numeric" } : {}) });
+}
+
 export default function SpacePage() {
   const { user } = useUser();
   const { theme, toggle } = useTheme();
@@ -444,26 +456,42 @@ export default function SpacePage() {
               <div style={{ textAlign: "center", padding: "40px 20px", color: text3 }}>
                 <p style={{ fontSize: 15, margin: 0 }}>No history matches &ldquo;{query}&rdquo;.</p>
               </div>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                {filteredHistory.map((item) => (
-                  <div key={item.id} style={{ background: "var(--lp-glass-surface)", backdropFilter: "var(--lp-glass-blur-card)", WebkitBackdropFilter: "var(--lp-glass-blur-card)", border: "1px solid var(--lp-glass-border)", borderRadius: 16, padding: "14px 18px", display: "flex", alignItems: "center", gap: 14, boxShadow: "0 2px 12px -4px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.45)" }}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <p style={{ ...SG, fontSize: 14, fontWeight: 600, color: text, margin: "0 0 4px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {item.title}
-                      </p>
-                      <p style={{ fontSize: 12, color: text3, margin: 0 }}>
-                        {item.source_url ? (() => { try { return new URL(item.source_url).hostname; } catch { return item.source; } })() : item.source}
-                        {" · "}Read {timeAgo(item.read_at)}
-                      </p>
+            ) : (() => {
+              const grouped = filteredHistory.reduce<{ label: string; items: HistoryItem[] }[]>((acc, item) => {
+                const label = getDateLabel(item.read_at);
+                const last = acc[acc.length - 1];
+                if (last && last.label === label) last.items.push(item);
+                else acc.push({ label, items: [item] });
+                return acc;
+              }, []);
+              return (
+                <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
+                  {grouped.map(({ label, items }) => (
+                    <div key={label}>
+                      <p style={{ ...SG, fontSize: 11, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase", color: text3, margin: "0 0 10px" }}>{label}</p>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                        {items.map((item) => (
+                          <div key={item.id} style={{ background: "var(--lp-glass-surface)", backdropFilter: "var(--lp-glass-blur-card)", WebkitBackdropFilter: "var(--lp-glass-blur-card)", border: "1px solid var(--lp-glass-border)", borderRadius: 16, padding: "14px 18px", display: "flex", alignItems: "center", gap: 14, boxShadow: "0 2px 12px -4px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.45)" }}>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <p style={{ ...SG, fontSize: 14, fontWeight: 600, color: text, margin: "0 0 4px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                {item.title}
+                              </p>
+                              <p style={{ fontSize: 12, color: text3, margin: 0 }}>
+                                {item.source_url ? (() => { try { return new URL(item.source_url).hostname; } catch { return item.source; } })() : item.source}
+                                {label === "Today" && ` · ${timeAgo(item.read_at)}`}
+                              </p>
+                            </div>
+                            <a href={`/stories/${item.id}`} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 36, height: 36, borderRadius: 9, background: `color-mix(in srgb, ${accent} 14%, transparent)`, color: accent, textDecoration: "none", fontSize: 16, flexShrink: 0 }}>
+                              →
+                            </a>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                    <a href={`/stories/${item.id}`} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 36, height: 36, borderRadius: 9, background: `color-mix(in srgb, ${accent} 14%, transparent)`, color: accent, textDecoration: "none", fontSize: 16, flexShrink: 0 }}>
-                      →
-                    </a>
-                  </div>
-                ))}
-              </div>
-            )}
+                  ))}
+                </div>
+              );
+            })()}
           </div>
         )}
 
