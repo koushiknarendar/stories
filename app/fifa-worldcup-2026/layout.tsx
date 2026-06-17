@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 
 const TITLE       = "FIFA World Cup 2026 — Live Hub | Storis";
 const DESCRIPTION = "Live scores, AI match recaps, lineup predictions, standings and top scorers for every FIFA World Cup 2026 match. USA · Canada · Mexico.";
-const OG_IMAGE    = "https://storis.in/api/og/worldcup";
+const OG_IMAGE    = "https://storis.in/worldcup-og.png";
 const PAGE_URL    = "https://storis.in/fifa-worldcup-2026";
 
 export const metadata: Metadata = {
@@ -18,10 +18,12 @@ export const metadata: Metadata = {
     siteName:    "Storis",
     images: [
       {
-        url:    OG_IMAGE,
-        width:  1200,
-        height: 630,
-        alt:    "FIFA World Cup 2026 — Live scores, AI recaps and lineup predictions on Storis",
+        url:       OG_IMAGE,
+        secureUrl: OG_IMAGE,
+        type:      "image/png",
+        width:     1200,
+        height:    630,
+        alt:       "FIFA World Cup 2026 — Live scores, AI recaps and lineup predictions on Storis",
       },
     ],
   },
