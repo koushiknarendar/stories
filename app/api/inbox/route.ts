@@ -27,6 +27,15 @@ function parseDate(raw: string | null | undefined): string | null {
   try { const d = new Date(raw.trim()); return isNaN(d.getTime()) ? null : d.toISOString(); } catch { return null; }
 }
 
+function parseDateFromText(text: string): string | null {
+  const mo = "January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Oct|Nov|Dec";
+  const m1 = text.match(new RegExp(`(${mo})\\.?\\s+(\\d{1,2}),?\\s+(\\d{4})`, "i"));
+  if (m1) return parseDate(m1[0]);
+  const m2 = text.match(new RegExp(`\\b(\\d{1,2})\\s+(${mo})\\.?\\s+(\\d{4})`, "i"));
+  if (m2) return parseDate(m2[0]);
+  return null;
+}
+
 async function fetchViaJina(url: string): Promise<{ title: string; text: string; publishedAt: string | null } | null> {
   try {
     const headers: Record<string, string> = { "X-Return-Format": "markdown" };
@@ -153,6 +162,7 @@ async function fetchVia12ft(url: string): Promise<{ title: string; text: string;
     }
 
     text = text.slice(0, 12_000);
+    if (!publishedAt) publishedAt = parseDateFromText(text);
     return text.length >= 100 ? { title, text, publishedAt } : null;
   } catch {
     return null;
@@ -199,6 +209,7 @@ async function fetchDirect(url: string): Promise<{ title: string; text: string; 
     const imageUrl = toAbsoluteUrl(url, rawImg);
     const container = $("article").length ? $("article") : $("main").length ? $("main") : $("body");
     const text = container.text().replace(/\s+/g, " ").trim().slice(0, 12_000);
+    if (!publishedAt) publishedAt = parseDateFromText(text);
     return text.length >= 100 ? { title, text, imageUrl, publishedAt } : null;
   } catch {
     return null;

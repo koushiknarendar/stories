@@ -304,7 +304,7 @@ export default function StoryReader({ set, storySetId, initialCardIndex = 0 }: P
               {/* Read time + position */}
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 12, paddingTop: 10, borderTop: "1px solid rgba(255,255,255,0.1)" }}>
                 <span style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.75)", textShadow: "0 1px 4px rgba(0,0,0,0.9)" }}>
-                  {card.readTime} read · {formatPublishedDate(set.publishedAt ?? set.savedAt)}
+                  {card.readTime} read{set.publishedAt ? ` · ${formatPublishedDate(set.publishedAt)}` : ""}
                 </span>
                 <span style={{ fontSize: 12, color: "rgba(255,255,255,0.68)", textShadow: "0 1px 4px rgba(0,0,0,0.9)" }}>
                   {isFirst ? "tap → to advance" : isLast ? `${cardIndex + 1} / ${total} · tap to restart` : `${cardIndex + 1} / ${total}`}
