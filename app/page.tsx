@@ -150,6 +150,7 @@ function HomeInner() {
         source: storiesData.source as string, sourceUrl: storiesData.sourceUrl as string | undefined,
         coverImageUrl: storiesData.imageUrl as string | undefined,
         category: storiesData.category as string | undefined,
+        publishedAt: storiesData.publishedAt as string | undefined ?? undefined,
         cards: storiesData.cards as StorySet["cards"], savedAt: new Date().toISOString(),
       };
       saveCurrent(storySet);

@@ -15,12 +15,24 @@ import type { StorySet } from "@/lib/types";
 import BottomNav from "@/components/BottomNav";
 import CollectionPicker from "@/components/CollectionPicker";
 
-interface StarredKey { cardIndex: number; bulletIndex: number; }
-function starKey(cardIndex: number, bulletIndex: number) { return `${cardIndex}_${bulletIndex}`; }
-
 const SWIPE_THRESHOLD = 80;
 const SG: React.CSSProperties = { fontFamily: "var(--font-space, 'Space Grotesk', sans-serif)" };
 const DEPTH_LIMIT: Record<string, number> = { light: 3, balanced: 5, deep: Infinity };
+
+function formatPublishedDate(iso: string | undefined): string {
+  if (!iso) return "";
+  try {
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return "";
+    const now = new Date();
+    const diffDays = Math.floor((now.getTime() - d.getTime()) / 86400000);
+    if (diffDays === 0) return "Today";
+    if (diffDays === 1) return "Yesterday";
+    if (diffDays < 7) return `${diffDays}d ago`;
+    if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`;
+    return d.toLocaleDateString("en-US", { month: "short", day: "numeric", ...(d.getFullYear() !== now.getFullYear() ? { year: "numeric" } : {}) });
+  } catch { return ""; }
+}
 
 interface Props {
   set: StorySet;
@@ -39,8 +51,6 @@ export default function StoryReader({ set, storySetId, initialCardIndex = 0 }: P
   const flying = useRef(false);
   const streakRecorded = useRef(false);
 
-  const [starred, setStarred] = useState<Set<string>>(new Set());
-  const [togglingBullet, setTogglingBullet] = useState<string | null>(null);
   const [cardLimit, setCardLimit] = useState<number>(5);
   const [showGuide, setShowGuide] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -93,19 +103,6 @@ export default function StoryReader({ set, storySetId, initialCardIndex = 0 }: P
     }).catch(() => {});
   }, [isLoggedIn, storySetId]);
 
-  // Load starred bullets
-  useEffect(() => {
-    if (!isLoggedIn || !storySetId) return;
-    fetch(`/api/stars?storySetId=${encodeURIComponent(storySetId)}`)
-      .then((r) => r.json())
-      .then((data: StarredKey[]) => {
-        if (Array.isArray(data)) {
-          setStarred(new Set(data.map((s) => starKey(s.cardIndex, s.bulletIndex))));
-        }
-      })
-      .catch(() => {});
-  }, [isLoggedIn, storySetId]);
-
   // Restore reading progress
   useEffect(() => {
     if (!storySetId) return;
@@ -133,23 +130,6 @@ export default function StoryReader({ set, storySetId, initialCardIndex = 0 }: P
     if (!storySetId) return;
     try { localStorage.setItem(`storis_progress_${storySetId}`, String(cardIndex)); } catch {}
   }, [storySetId, cardIndex]);
-
-  async function toggleStar(bulletIndex: number) {
-    if (!isLoggedIn || !storySetId) return;
-    const key = starKey(cardIndex, bulletIndex);
-    if (togglingBullet === key) return;
-    setTogglingBullet(key);
-    const isStarred = starred.has(key);
-    try {
-      if (isStarred) {
-        await fetch("/api/stars", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ storySetId, cardIndex, bulletIndex }) });
-        setStarred((prev) => { const next = new Set(prev); next.delete(key); return next; });
-      } else {
-        await fetch("/api/stars", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ storySetId, storyTitle: set.title, cardIndex, bulletIndex, bulletText: card.bullets[bulletIndex] }) });
-        setStarred((prev) => new Set([...prev, key]));
-      }
-    } catch { /* silent */ } finally { setTogglingBullet(null); }
-  }
 
   async function flyOff(dir: 1 | -1, destination = "/") {
     if (flying.current) return;
@@ -313,30 +293,19 @@ export default function StoryReader({ set, storySetId, initialCardIndex = 0 }: P
 
               {/* Bullets */}
               <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 8 }}>
-                {(card.bullets ?? []).map((b, i) => {
-                  const key = starKey(cardIndex, i);
-                  const isStarred = starred.has(key);
-                  return (
-                    <li key={i} style={{ display: "flex", gap: 9, color: "rgba(255,255,255,0.9)", fontSize: "clamp(13px,3.2vw,15px)", lineHeight: 1.5, alignItems: "flex-start", textShadow: "0 1px 5px rgba(0,0,0,0.95)" }}>
-                      <span style={{ color: "rgba(255,255,255,0.35)", flexShrink: 0, marginTop: 2 }}>—</span>
-                      <span style={{ flex: 1 }}>{b}</span>
-                      {isLoggedIn && storySetId && (
-                        <button
-                          onClick={(e) => { e.stopPropagation(); toggleStar(i); }}
-                          aria-label={isStarred ? "Unstar" : "Star"}
-                          style={{ background: "none", border: "none", cursor: "pointer", padding: "2px 0 0", flexShrink: 0, fontSize: 15, color: isStarred ? "#FBBF24" : "rgba(255,255,255,0.22)", transition: "color .15s", opacity: togglingBullet === key ? 0.5 : 1 }}
-                        >
-                          {isStarred ? "★" : "☆"}
-                        </button>
-                      )}
-                    </li>
-                  );
-                })}
+                {(card.bullets ?? []).map((b, i) => (
+                  <li key={i} style={{ display: "flex", gap: 9, color: "rgba(255,255,255,0.9)", fontSize: "clamp(13px,3.2vw,15px)", lineHeight: 1.5, alignItems: "flex-start", textShadow: "0 1px 5px rgba(0,0,0,0.95)" }}>
+                    <span style={{ color: "rgba(255,255,255,0.35)", flexShrink: 0, marginTop: 2 }}>—</span>
+                    <span style={{ flex: 1 }}>{b}</span>
+                  </li>
+                ))}
               </ul>
 
               {/* Read time + position */}
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 12, paddingTop: 10, borderTop: "1px solid rgba(255,255,255,0.1)" }}>
-                <span style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.75)", textShadow: "0 1px 4px rgba(0,0,0,0.9)" }}>{card.readTime} read</span>
+                <span style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.75)", textShadow: "0 1px 4px rgba(0,0,0,0.9)" }}>
+                  {card.readTime} read · {formatPublishedDate(set.publishedAt ?? set.savedAt)}
+                </span>
                 <span style={{ fontSize: 12, color: "rgba(255,255,255,0.68)", textShadow: "0 1px 4px rgba(0,0,0,0.9)" }}>
                   {isFirst ? "tap → to advance" : isLast ? `${cardIndex + 1} / ${total} · tap to restart` : `${cardIndex + 1} / ${total}`}
                 </span>

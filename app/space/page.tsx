@@ -47,16 +47,6 @@ interface HistoryItem {
   read_at: string;
 }
 
-interface StarredBullet {
-  id: string;
-  story_set_id: string;
-  story_title: string;
-  card_index: number;
-  bullet_index: number;
-  bullet_text: string;
-  created_at: string;
-}
-
 interface ChatMessage {
   role: "user" | "assistant";
   content: string;
@@ -81,19 +71,16 @@ export default function SpacePage() {
   const [query, setQuery] = useState("");
   const [activeTab, setActiveTab] = useState<LibTab>("saved");
   const [historyEnabled, setHistoryEnabled] = useState(false);
-  const [showAllStars, setShowAllStars] = useState(false);
   const [askLoading, setAskLoading] = useState(false);
   const [chat, setChat] = useState<ChatMessage[]>([]);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   const { data: spaceRaw, mutate: mutateSpace } = useSWR("/api/space", fetcher);
   const { data: collectionsRaw, mutate: mutateCollections } = useSWR("/api/collections", fetcher);
-  const { data: starsRaw, mutate: mutateStars } = useSWR("/api/stars?all=1", fetcher);
   const { data: historyRaw } = useSWR(historyEnabled ? "/api/history" : null, fetcher);
 
   const items: SpaceItem[] = Array.isArray(spaceRaw) ? spaceRaw : [];
   const collections: Collection[] = Array.isArray(collectionsRaw) ? collectionsRaw : [];
-  const starredBullets: StarredBullet[] = Array.isArray(starsRaw) ? starsRaw : [];
   const history: HistoryItem[] = Array.isArray(historyRaw) ? historyRaw : [];
   const historyLoaded = historyRaw !== undefined;
 
@@ -169,15 +156,6 @@ export default function SpacePage() {
     }).catch(() => {});
   }
 
-  async function handleUnstar(bullet: StarredBullet) {
-    mutateStars(starredBullets.filter((b) => b.id !== bullet.id), { revalidate: false });
-    await fetch("/api/stars", {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ storySetId: bullet.story_set_id, cardIndex: bullet.card_index, bulletIndex: bullet.bullet_index }),
-    }).catch(() => {});
-  }
-
   async function handleAsk(e?: React.FormEvent) {
     e?.preventDefault();
     const q = query.trim();
@@ -206,8 +184,6 @@ export default function SpacePage() {
   const text2   = "var(--lp-text2)";
   const text3   = "var(--lp-text3)";
   const accent  = "var(--lp-accent)";
-
-  const visibleStars = showAllStars ? starredBullets : starredBullets.slice(0, 5);
 
   // suppress unused warning
   void copiedId; void handleShare;
@@ -447,32 +423,6 @@ export default function SpacePage() {
               </>
             )}
 
-            {/* Starred bullets */}
-            {starredBullets.length > 0 && (
-              <div style={{ marginTop: 40 }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-                  <p style={{ ...SG, fontSize: 11, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", color: text3, margin: 0 }}>★ Starred insights</p>
-                  <span style={{ fontSize: 12, color: text3 }}>{starredBullets.length}</span>
-                </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  {visibleStars.map((bullet) => (
-                    <div key={bullet.id} style={{ background: "var(--lp-glass-surface)", backdropFilter: "var(--lp-glass-blur-card)", WebkitBackdropFilter: "var(--lp-glass-blur-card)", border: "1px solid var(--lp-glass-border)", borderRadius: 12, padding: "12px 14px", display: "flex", alignItems: "flex-start", gap: 10, boxShadow: "0 2px 12px -4px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.45)" }}>
-                      <span style={{ color: "#FBBF24", fontSize: 13, flexShrink: 0, marginTop: 1 }}>★</span>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <p style={{ fontSize: 13, color: text, margin: "0 0 4px", lineHeight: 1.5 }}>{bullet.bullet_text}</p>
-                        <a href={`/stories/${bullet.story_set_id}`} style={{ fontSize: 11, color: text3, textDecoration: "none", fontWeight: 500 }}>{bullet.story_title}</a>
-                      </div>
-                      <button onClick={() => handleUnstar(bullet)} aria-label="Unstar" style={{ background: "none", border: "none", color: text3, cursor: "pointer", fontSize: 14, padding: 2, flexShrink: 0 }}>✕</button>
-                    </div>
-                  ))}
-                </div>
-                {starredBullets.length > 5 && (
-                  <button onClick={() => setShowAllStars((v) => !v)} style={{ ...SG, marginTop: 10, fontSize: 12, fontWeight: 600, color: accent, background: "none", border: "none", cursor: "pointer", padding: 0 }}>
-                    {showAllStars ? "Show less" : `Show all ${starredBullets.length}`}
-                  </button>
-                )}
-              </div>
-            )}
           </>
         )}
 

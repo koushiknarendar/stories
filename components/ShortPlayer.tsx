@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useUser } from "@clerk/nextjs";
 import CollectionPicker from "@/components/CollectionPicker";
+import BottomNav from "@/components/BottomNav";
 import type { StorySet } from "@/lib/types";
 
 const SG: React.CSSProperties = { fontFamily: "var(--font-space, 'Space Grotesk', sans-serif)" };
@@ -141,6 +142,8 @@ export default function ShortPlayer({ set, storySetId, onSave, saved = false }: 
         onSave={handleSave}
         storyTitle={set.title}
       />
+
+      {isSignedIn && <BottomNav />}
     </div>
   );
 }
