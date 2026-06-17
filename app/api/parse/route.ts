@@ -70,13 +70,14 @@ async function fetchViaJina(url: string): Promise<{ title: string; text: string;
     const titleMatch = raw.match(/^Title:\s*(.+)/m);
     const title = titleMatch?.[1]?.trim() || new URL(url).hostname;
     const pubMatch = raw.match(/^Published Time:\s*(.+)/m);
-    const publishedAt = parseDate(pubMatch?.[1]);
+    let publishedAt = parseDate(pubMatch?.[1]);
     const text = raw
       .replace(/^(Title|URL Source|Published Time|Description|Warning|Markdown Content):.*\n?/gm, "")
       .replace(/!\[Image[^\]]*\]\([^)]*\)/g, "")
       .replace(/\s+/g, " ")
       .trim()
       .slice(0, 12_000);
+    if (!publishedAt) publishedAt = parseDateFromText(raw);
     return text.length >= 100 ? { title, text, publishedAt } : null;
   } catch {
     return null;
