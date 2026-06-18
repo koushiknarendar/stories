@@ -496,6 +496,23 @@ export async function getDailyCard(clerkUserId: string): Promise<{
 
 // ─── Discover / generated stories helpers ────────────────────────────────────
 
+export async function searchStorySets(query: string): Promise<{
+  id: string; title: string; source: string; source_url: string | null;
+  cover_image_url: string | null; category: string | null; saved_at: string; published_at: string | null;
+}[]> {
+  const sql = getDb();
+  if (!sql) return [];
+  const pattern = `%${query}%`;
+  return sql`
+    SELECT id, title, source, source_url, cover_image_url, category, saved_at, published_at
+    FROM story_sets
+    WHERE is_generated = true
+      AND title ILIKE ${pattern}
+    ORDER BY generated_at DESC
+    LIMIT 15
+  `;
+}
+
 export async function getGeneratedStories(categories: string[]): Promise<{
   id: string; title: string; source: string; source_url: string | null;
   cover_image_url: string | null; category: string | null; saved_at: string;

@@ -155,6 +155,28 @@ export function buildCompanyUser(text: string, name: string): string {
   return `Company: ${name}\n\nCompany page content:\n${cleanText(text).slice(0, 6_000)}`;
 }
 
+export const TOPIC_SYSTEM = `You are a content editor for a mobile stories app. Generate insightful, surprising story cards about the given topic — treat it like writing the best expert thread on the subject.
+
+Return ONLY a valid JSON object — no markdown, no prose, no code fences:
+{
+  "title": "<engaging, specific story title (max 12 words)>",
+  "cards": [
+    {
+      "headline": "Fully standalone, curiosity-gap headline (max 8 words)",
+      "bullets": ["Concrete fact or surprising insight (max 20 words)", "Another key point (max 20 words)", "What this means for you personally (max 20 words)"],
+      "readTime": "15s"
+    }
+  ]
+}
+
+${RULES_BLOCK}
+
+Generate 5–7 cards. First card must open with the most surprising or counter-intuitive thing about this topic.`;
+
+export function buildTopicUser(topic: string): string {
+  return `Topic: ${topic}`;
+}
+
 // ─── Dynamic user messages (article-specific, not cached) ─────────────────────
 
 function cleanText(text: string): string {
