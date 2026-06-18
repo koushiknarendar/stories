@@ -10,7 +10,7 @@ import type { StorySet } from "@/lib/types";
 
 export default function StoriesPage() {
   const router = useRouter();
-  const { isLoaded, isSignedIn } = useUser();
+  const { isLoaded } = useUser();
   const [set, setSet] = useState<StorySet | null>(null);
   const [storySetId, setStorySetId] = useState<string | undefined>(undefined);
   const [shortSaved, setShortSaved] = useState(false);
@@ -22,9 +22,9 @@ export default function StoriesPage() {
     setSet(data);
   }, [router]);
 
-  // Auto-save regular story sets (not Shorts — those are saved on user action)
+  // Auto-save regular story sets for all users (guests get an anon save for shareability)
   useEffect(() => {
-    if (!set || !isLoaded || !isSignedIn || savedRef.current) return;
+    if (!set || !isLoaded || savedRef.current) return;
     if (set.source === "youtube-short") return;
     savedRef.current = true;
     fetch("/api/space", {
@@ -35,7 +35,7 @@ export default function StoriesPage() {
       .then(r => r.json())
       .then(data => { if (data.id) setStorySetId(data.id); })
       .catch(() => {});
-  }, [set, isLoaded, isSignedIn]);
+  }, [set, isLoaded]);
 
   async function handleSaveShort(collectionId?: string) {
     if (!set) return;

@@ -5,19 +5,18 @@ import { createContext, useContext, useEffect, useState } from "react";
 type Theme = "light" | "dark";
 type Ctx = { theme: Theme; toggle: () => void };
 
-const ThemeCtx = createContext<Ctx>({ theme: "dark", toggle: () => {} });
+const ThemeCtx = createContext<Ctx>({ theme: "light", toggle: () => {} });
 
 export function useTheme() {
   return useContext(ThemeCtx);
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setTheme] = useState<Theme>("dark");
+  const [theme, setTheme] = useState<Theme>("light");
 
   useEffect(() => {
     const stored = localStorage.getItem("theme") as Theme | null;
-    const resolved =
-      stored ?? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    const resolved = stored ?? "light";
     setTheme(resolved);
     document.documentElement.classList.toggle("dark", resolved === "dark");
   }, []);

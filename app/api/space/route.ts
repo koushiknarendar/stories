@@ -1,7 +1,7 @@
 export const runtime = "nodejs";
 
 import { auth } from "@clerk/nextjs/server";
-import { listStorySets, deleteStorySet, saveStorySet, createInboxItem, markInboxItemDone } from "@/lib/db";
+import { listStorySets, deleteStorySet, saveStorySet, saveStorySetAnon, createInboxItem, markInboxItemDone } from "@/lib/db";
 import type { StorySet } from "@/lib/types";
 
 export async function GET() {
@@ -16,12 +16,17 @@ export async function GET() {
 // Called when user taps Save in the story reader (guest flow → logged-in save)
 export async function POST(request: Request) {
   const { userId } = await auth();
-  if (!userId) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
   const set = await request.json() as StorySet;
   const isShort = set?.source === "youtube-short";
   if (!set?.id || (!set?.cards?.length && !isShort)) {
     return Response.json({ error: "Invalid story set" }, { status: 400 });
+  }
+
+  if (!userId) {
+    // Guest save — persist for shareability without linking to a user account
+    await saveStorySetAnon(set, set.cards).catch(() => {});
+    return Response.json({ ok: true, id: set.id });
   }
 
   // Skip if this story set already exists in the user's space

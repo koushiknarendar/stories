@@ -228,6 +228,27 @@ export async function deleteInboxItem(id: string, clerkUserId: string) {
 
 // ─── Story set helpers ────────────────────────────────────────────────────────
 
+export async function saveStorySetAnon(set: StorySet, cards: StoryCard[]) {
+  const sql = getDb();
+  if (!sql) throw new Error("DB not configured");
+
+  const inserted = await sql<{ id: string }[]>`
+    INSERT INTO story_sets (id, clerk_user_id, title, source, source_url, cover_image_url, category, published_at)
+    VALUES (${set.id}, 'anon', ${set.title}, ${set.source}, ${set.sourceUrl ?? null}, ${set.coverImageUrl ?? null}, ${set.category ?? null}, ${set.publishedAt ?? null})
+    ON CONFLICT (id) DO NOTHING
+    RETURNING id
+  `;
+
+  if (inserted.length > 0) {
+    for (const [i, card] of cards.entries()) {
+      await sql`
+        INSERT INTO story_cards (story_set_id, card_index, headline, bullets, read_time)
+        VALUES (${set.id}, ${i}, ${card.headline}, ${JSON.stringify(card.bullets ?? [])}::jsonb, ${card.readTime})
+      `;
+    }
+  }
+}
+
 export async function saveStorySet(
   clerkUserId: string,
   inboxItemId: string,
