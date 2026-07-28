@@ -5,7 +5,7 @@ const isProtected = createRouteMatcher(["/space(.*)", "/collections(.*)", "/inbo
 
 export const proxy = clerkMiddleware(async (auth, request) => {
   if (isProtected(request as NextRequest)) {
-    await auth.protect();
+    await auth.protect({ unauthenticatedUrl: new URL("/sign-in", request.url).toString() });
   }
 });
 
