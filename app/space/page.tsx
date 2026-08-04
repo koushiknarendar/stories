@@ -197,9 +197,6 @@ export default function SpacePage() {
   const text3   = "var(--lp-text3)";
   const accent  = "var(--lp-accent)";
 
-  // suppress unused warning
-  void copiedId; void handleShare;
-
   return (
     <div style={{ minHeight: "100vh", background: "var(--lp-page-bg)", color: text, paddingBottom: "calc(78px + env(safe-area-inset-bottom, 0px))" }}>
 
@@ -310,9 +307,21 @@ export default function SpacePage() {
                         <span>{timeAgo(item._ts)}</span>
                       </p>
                     </div>
-                    <a href={`/stories/${item.id}`} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 36, height: 36, borderRadius: 9, background: `color-mix(in srgb, ${accent} 14%, transparent)`, color: accent, textDecoration: "none", fontSize: 16, flexShrink: 0 }}>
-                      →
-                    </a>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+                      <button
+                        onClick={() => handleShare(item.id, item.title)}
+                        aria-label="Share"
+                        style={{ width: 36, height: 36, borderRadius: 9, border: "none", background: "transparent", color: copiedId === item.id ? "#34D399" : text3, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "color .2s" }}
+                      >
+                        {copiedId === item.id
+                          ? <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round"><path d="M20 6 9 17l-5-5"/></svg>
+                          : <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+                        }
+                      </button>
+                      <a href={`/stories/${item.id}`} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 36, height: 36, borderRadius: 9, background: `color-mix(in srgb, ${accent} 14%, transparent)`, color: accent, textDecoration: "none", fontSize: 16 }}>
+                        →
+                      </a>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -481,9 +490,21 @@ export default function SpacePage() {
                                 {label === "Today" && ` · ${timeAgo(item.read_at)}`}
                               </p>
                             </div>
-                            <a href={`/stories/${item.id}`} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 36, height: 36, borderRadius: 9, background: `color-mix(in srgb, ${accent} 14%, transparent)`, color: accent, textDecoration: "none", fontSize: 16, flexShrink: 0 }}>
-                              →
-                            </a>
+                            <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+                              <button
+                                onClick={() => handleShare(item.id, item.title)}
+                                aria-label="Share"
+                                style={{ width: 36, height: 36, borderRadius: 9, border: "none", background: "transparent", color: copiedId === item.id ? "#34D399" : text3, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "color .2s" }}
+                              >
+                                {copiedId === item.id
+                                  ? <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round"><path d="M20 6 9 17l-5-5"/></svg>
+                                  : <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+                                }
+                              </button>
+                              <a href={`/stories/${item.id}`} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 36, height: 36, borderRadius: 9, background: `color-mix(in srgb, ${accent} 14%, transparent)`, color: accent, textDecoration: "none", fontSize: 16 }}>
+                                →
+                              </a>
+                            </div>
                           </div>
                         ))}
                       </div>
