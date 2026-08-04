@@ -208,13 +208,17 @@ function MatchTile({ match, onReadStory, generating }: {
   const isLive    = match.status === "IN_PLAY" || match.status === "PAUSED";
   const hGoals    = goalList(match.goals ?? [], match.homeTeam.name);
   const aGoals    = goalList(match.goals ?? [], match.awayTeam.name);
+  const [copied, setCopied] = useState(false);
 
-  function handleShare() {
+  async function handleShare() {
     const text = `${match.homeTeam.shortName} ${match.score.fullTime.home ?? 0}–${match.score.fullTime.away ?? 0} ${match.awayTeam.shortName} · FIFA World Cup 2026`;
+    const url = window.location.href;
     if (navigator.share) {
-      navigator.share({ title: text, url: window.location.href }).catch(() => {});
+      navigator.share({ title: text, url }).catch(() => {});
     } else {
-      navigator.clipboard?.writeText(window.location.href);
+      await navigator.clipboard.writeText(url).catch(() => {});
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
     }
   }
 
@@ -229,7 +233,7 @@ function MatchTile({ match, onReadStory, generating }: {
           {isLive
             ? <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10, fontWeight: 700, color: "#e53e3e" }}><span style={{ width: 6, height: 6, borderRadius: "50%", background: "#e53e3e", animation: "wc-pulse 1.2s ease-in-out infinite" }} />LIVE</span>
             : <span style={{ fontSize: 10, fontWeight: 600, color: "var(--lp-text3)" }}>FT</span>}
-          <button onClick={handleShare} title="Share" style={{ background: "none", border: "none", cursor: "pointer", color: "var(--lp-text3)", padding: "0 0 0 4px", lineHeight: 1, fontSize: 13 }}>⬆</button>
+          <button onClick={handleShare} title="Share" aria-label="Share" style={{ background: "none", border: "none", cursor: "pointer", color: copied ? "#34D399" : "var(--lp-text3)", padding: "0 0 0 4px", lineHeight: 1, fontSize: 13 }}>{copied ? "✓" : "⬆"}</button>
         </div>
       </div>
 
