@@ -24,26 +24,28 @@ export async function POST(request: Request) {
   }
 
   if (!userId) {
-    // Guest save — persist for shareability without linking to a user account
+    // Guest save — persist for shareability without linking to a user account.
+    // Reuses an existing story if this URL was already converted by anyone.
     try {
-      await saveStorySetAnon(set, set.cards);
+      const id = await saveStorySetAnon(set, set.cards);
+      return Response.json({ ok: true, id });
     } catch {
       return Response.json({ error: "Failed to save story" }, { status: 500 });
     }
-    return Response.json({ ok: true, id: set.id });
   }
 
-  // Skip if this story set already exists in the user's space
+  // Skip if this exact story set is already saved
   const existing = await listStorySets(userId);
-  if (existing.some((s) => s.id === set.id)) {
-    return Response.json({ ok: true, id: set.id });
+  const existingMatch = existing.find((s) => s.id === set.id || (set.sourceUrl && s.source_url === set.sourceUrl));
+  if (existingMatch) {
+    return Response.json({ ok: true, id: existingMatch.id });
   }
 
   const item = await createInboxItem(userId, set.sourceUrl ?? null, set.source);
-  await saveStorySet(userId, item.id, set, set.cards);
+  const id = await saveStorySet(userId, item.id, set, set.cards);
   await markInboxItemDone(item.id, set.title);
 
-  return Response.json({ ok: true, id: set.id });
+  return Response.json({ ok: true, id });
 }
 
 export async function DELETE(request: Request) {

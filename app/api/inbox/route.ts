@@ -335,10 +335,10 @@ export async function POST(request: Request) {
       savedAt: new Date().toISOString(),
     };
 
-    await saveStorySet(userId, item.id, storySet, generated.cards);
+    const id = await saveStorySet(userId, item.id, storySet, generated.cards);
     await markInboxItemDone(item.id, storySet.title);
 
-    return Response.json({ id: storySet.id, title: storySet.title, itemId: item.id });
+    return Response.json({ id, title: storySet.title, itemId: item.id });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Unknown error";
     await markInboxItemError(item.id, msg).catch(() => {});

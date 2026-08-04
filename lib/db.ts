@@ -228,9 +228,17 @@ export async function deleteInboxItem(id: string, clerkUserId: string) {
 
 // ─── Story set helpers ────────────────────────────────────────────────────────
 
-export async function saveStorySetAnon(set: StorySet, cards: StoryCard[]) {
+// Anyone converting the same URL (any owner) lands on the same shareable story.
+export async function saveStorySetAnon(set: StorySet, cards: StoryCard[]): Promise<string> {
   const sql = getDb();
   if (!sql) throw new Error("DB not configured");
+
+  if (set.sourceUrl) {
+    const [existing] = await sql<{ id: string }[]>`
+      SELECT id FROM story_sets WHERE source_url = ${set.sourceUrl} LIMIT 1
+    `;
+    if (existing) return existing.id;
+  }
 
   const inserted = await sql<{ id: string }[]>`
     INSERT INTO story_sets (id, clerk_user_id, title, source, source_url, cover_image_url, category, published_at)
@@ -247,16 +255,26 @@ export async function saveStorySetAnon(set: StorySet, cards: StoryCard[]) {
       `;
     }
   }
+  return set.id;
 }
 
+// Re-converting a URL already in this user's library returns the existing story
+// instead of duplicating it.
 export async function saveStorySet(
   clerkUserId: string,
   inboxItemId: string,
   set: StorySet,
   cards: StoryCard[]
-) {
+): Promise<string> {
   const sql = getDb();
   if (!sql) throw new Error("DB not configured");
+
+  if (set.sourceUrl) {
+    const [existing] = await sql<{ id: string }[]>`
+      SELECT id FROM story_sets WHERE clerk_user_id = ${clerkUserId} AND source_url = ${set.sourceUrl} LIMIT 1
+    `;
+    if (existing) return existing.id;
+  }
 
   await sql`
     INSERT INTO story_sets (id, clerk_user_id, inbox_item_id, title, source, source_url, cover_image_url, category, published_at)
@@ -270,6 +288,7 @@ export async function saveStorySet(
       VALUES (${set.id}, ${i}, ${card.headline}, ${JSON.stringify(card.bullets ?? [])}::jsonb, ${card.readTime})
     `;
   }
+  return set.id;
 }
 
 export async function loadStorySet(id: string): Promise<StorySet | null> {
