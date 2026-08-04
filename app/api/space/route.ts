@@ -25,7 +25,11 @@ export async function POST(request: Request) {
 
   if (!userId) {
     // Guest save — persist for shareability without linking to a user account
-    await saveStorySetAnon(set, set.cards).catch(() => {});
+    try {
+      await saveStorySetAnon(set, set.cards);
+    } catch {
+      return Response.json({ error: "Failed to save story" }, { status: 500 });
+    }
     return Response.json({ ok: true, id: set.id });
   }
 
