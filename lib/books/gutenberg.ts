@@ -33,7 +33,7 @@ export function stripBoilerplate(raw: string): string {
 // asides (sometimes spanning several lines) — strip them so excerpts read cleanly.
 function stripIllustrationTags(text: string): string {
   // Allows one level of nested brackets (e.g. a "[_Copyright ..._]" credit inside the caption).
-  return text.replace(/\[Illustration:?(?:[^[\]]|\[[^[\]]*\])*\]/gis, "").replace(/\n{3,}/g, "\n\n");
+  return text.replace(/\[Illustration:?(?:[^[\]]|\[[^[\]]*\])*\]/gi, "").replace(/\n{3,}/g, "\n\n");
 }
 
 export function parseGutenbergTitleAuthor(raw: string): { title: string | null; author: string | null } {
