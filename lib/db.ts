@@ -1,5 +1,5 @@
 import postgres from "postgres";
-import type { StorySet, StoryCard, InboxItem, Note } from "./types";
+import type { StorySet, StoryCard, InboxItem, Note, Book, BookCard, BookWithCards, BookProgress } from "./types";
 
 let _sql: ReturnType<typeof postgres> | null = null;
 
@@ -169,6 +169,52 @@ export async function runMigration() {
       PRIMARY KEY   (collection_id, story_set_id)
     )
   `;
+
+  // ─── Books ──────────────────────────────────────────────────────────────
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS books (
+      id              TEXT        PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      title           TEXT        NOT NULL,
+      author          TEXT,
+      source_type     TEXT        NOT NULL CHECK (source_type IN ('gutenberg','ai-summary','upload')),
+      source_ref      TEXT,
+      cover_image_url TEXT,
+      category        TEXT,
+      total_cards     INT         NOT NULL DEFAULT 0,
+      status          TEXT        NOT NULL DEFAULT 'ready',
+      added_by_user   TEXT        NOT NULL DEFAULT '__catalog__',
+      created_at      TIMESTAMPTZ DEFAULT NOW()
+    )
+  `;
+  await sql`CREATE INDEX IF NOT EXISTS books_catalog_idx ON books(added_by_user, status)`;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS book_cards (
+      id            SERIAL      PRIMARY KEY,
+      book_id       TEXT        REFERENCES books(id) ON DELETE CASCADE,
+      card_index    INT         NOT NULL,
+      chapter_label TEXT,
+      kind          TEXT        NOT NULL CHECK (kind IN ('text','summary')),
+      headline      TEXT,
+      content       JSONB       NOT NULL,
+      read_time     TEXT
+    )
+  `;
+  await sql`CREATE INDEX IF NOT EXISTS book_cards_book_idx ON book_cards(book_id, card_index)`;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS user_book_progress (
+      clerk_user_id       TEXT        NOT NULL,
+      book_id             TEXT        REFERENCES books(id) ON DELETE CASCADE,
+      current_card_index  INT         NOT NULL DEFAULT 0,
+      started_at          TIMESTAMPTZ DEFAULT NOW(),
+      last_read_at        TIMESTAMPTZ DEFAULT NOW(),
+      completed_at        TIMESTAMPTZ,
+      PRIMARY KEY (clerk_user_id, book_id)
+    )
+  `;
+  await sql`CREATE INDEX IF NOT EXISTS user_book_progress_user_idx ON user_book_progress(clerk_user_id)`;
 }
 
 // ─── Inbox helpers ────────────────────────────────────────────────────────────
@@ -788,5 +834,148 @@ export async function getCollectionItems(id: string, clerkUserId: string): Promi
     WHERE ci.collection_id = ${id}
       AND EXISTS (SELECT 1 FROM collections WHERE id = ${id} AND clerk_user_id = ${clerkUserId})
     ORDER BY ci.added_at DESC
+  `;
+}
+
+// ─── Books ────────────────────────────────────────────────────────────────
+
+type BookRow = {
+  id: string; title: string; author: string | null; source_type: string; source_ref: string | null;
+  cover_image_url: string | null; category: string | null; total_cards: number; status: string;
+  added_by_user: string; created_at: string;
+};
+
+function rowToBook(r: BookRow): Book {
+  return {
+    id: r.id, title: r.title, author: r.author,
+    sourceType: r.source_type as Book["sourceType"], sourceRef: r.source_ref,
+    coverImageUrl: r.cover_image_url, category: r.category, totalCards: r.total_cards,
+    status: r.status as Book["status"], addedByUser: r.added_by_user, createdAt: r.created_at,
+  };
+}
+
+export async function createBook(book: {
+  title: string; author?: string | null; sourceType: Book["sourceType"]; sourceRef?: string | null;
+  coverImageUrl?: string | null; category?: string | null; addedByUser?: string;
+}): Promise<string> {
+  const sql = getDb();
+  if (!sql) throw new Error("DB not configured");
+  const [row] = await sql<[{ id: string }]>`
+    INSERT INTO books (title, author, source_type, source_ref, cover_image_url, category, status, added_by_user)
+    VALUES (${book.title}, ${book.author ?? null}, ${book.sourceType}, ${book.sourceRef ?? null}, ${book.coverImageUrl ?? null}, ${book.category ?? null}, 'processing', ${book.addedByUser ?? "__catalog__"})
+    RETURNING id
+  `;
+  return row.id;
+}
+
+export async function insertBookCards(bookId: string, cards: Omit<BookCard, "cardIndex">[]): Promise<void> {
+  const sql = getDb();
+  if (!sql) throw new Error("DB not configured");
+
+  // Bulk-insert in batches — a book can produce 1000+ cards, and one round-trip
+  // per row risks hitting serverless function time limits on ingest.
+  const BATCH_SIZE = 200;
+  for (let batchStart = 0; batchStart < cards.length; batchStart += BATCH_SIZE) {
+    const batch = cards.slice(batchStart, batchStart + BATCH_SIZE).map((card, i) => ({
+      book_id: bookId,
+      card_index: batchStart + i,
+      chapter_label: card.chapterLabel,
+      kind: card.kind,
+      headline: card.headline,
+      content: card.kind === "text" ? { excerpt: card.excerpt ?? "" } : { bullets: card.bullets ?? [] },
+      read_time: card.readTime,
+    }));
+    await sql`
+      INSERT INTO book_cards ${sql(batch, "book_id", "card_index", "chapter_label", "kind", "headline", "content", "read_time")}
+    `;
+  }
+  await sql`UPDATE books SET total_cards = ${cards.length}, status = 'ready' WHERE id = ${bookId}`;
+}
+
+export async function markBookError(bookId: string): Promise<void> {
+  const sql = getDb();
+  if (!sql) return;
+  await sql`UPDATE books SET status = 'error' WHERE id = ${bookId}`;
+}
+
+export async function listBooks(category?: string): Promise<Book[]> {
+  const sql = getDb();
+  if (!sql) return [];
+  const rows = category
+    ? await sql<BookRow[]>`SELECT * FROM books WHERE added_by_user = '__catalog__' AND status = 'ready' AND category = ${category} ORDER BY created_at DESC`
+    : await sql<BookRow[]>`SELECT * FROM books WHERE added_by_user = '__catalog__' AND status = 'ready' ORDER BY created_at DESC`;
+  return rows.map(rowToBook);
+}
+
+export async function listUserUploadedBooks(clerkUserId: string): Promise<Book[]> {
+  const sql = getDb();
+  if (!sql) return [];
+  const rows = await sql<BookRow[]>`
+    SELECT * FROM books WHERE added_by_user = ${clerkUserId} ORDER BY created_at DESC
+  `;
+  return rows.map(rowToBook);
+}
+
+export async function getBook(id: string): Promise<BookWithCards | null> {
+  const sql = getDb();
+  if (!sql) return null;
+  const [row] = await sql<BookRow[]>`SELECT * FROM books WHERE id = ${id}`;
+  if (!row) return null;
+
+  const cardRows = await sql<{ card_index: number; chapter_label: string | null; kind: string; headline: string | null; content: unknown; read_time: string | null }[]>`
+    SELECT card_index, chapter_label, kind, headline, content, read_time
+    FROM book_cards WHERE book_id = ${id} ORDER BY card_index
+  `;
+
+  const cards: BookCard[] = cardRows.map((c) => {
+    let content: { excerpt?: string; bullets?: string[] } = {};
+    if (c.content && typeof c.content === "object") content = c.content as typeof content;
+    else if (typeof c.content === "string") { try { content = JSON.parse(c.content); } catch { content = {}; } }
+    return {
+      cardIndex: c.card_index, chapterLabel: c.chapter_label, kind: c.kind as BookCard["kind"],
+      headline: c.headline, excerpt: content.excerpt, bullets: content.bullets, readTime: c.read_time,
+    };
+  });
+
+  return { ...rowToBook(row), cards };
+}
+
+export async function getBookProgress(clerkUserId: string, bookId: string): Promise<BookProgress | null> {
+  const sql = getDb();
+  if (!sql) return null;
+  const [row] = await sql<{ book_id: string; current_card_index: number; started_at: string; last_read_at: string; completed_at: string | null }[]>`
+    SELECT book_id, current_card_index, started_at::text, last_read_at::text, completed_at::text
+    FROM user_book_progress WHERE clerk_user_id = ${clerkUserId} AND book_id = ${bookId}
+  `;
+  if (!row) return null;
+  return { bookId: row.book_id, currentCardIndex: row.current_card_index, startedAt: row.started_at, lastReadAt: row.last_read_at, completedAt: row.completed_at };
+}
+
+export async function listUserBookProgress(clerkUserId: string): Promise<(BookProgress & { book: Book })[]> {
+  const sql = getDb();
+  if (!sql) return [];
+  const rows = await sql<(BookRow & { current_card_index: number; started_at: string; last_read_at: string; completed_at: string | null })[]>`
+    SELECT b.*, p.current_card_index, p.started_at::text, p.last_read_at::text, p.completed_at::text
+    FROM user_book_progress p
+    JOIN books b ON b.id = p.book_id
+    WHERE p.clerk_user_id = ${clerkUserId}
+    ORDER BY p.last_read_at DESC
+  `;
+  return rows.map((r) => ({
+    bookId: r.id, currentCardIndex: r.current_card_index, startedAt: r.started_at,
+    lastReadAt: r.last_read_at, completedAt: r.completed_at, book: rowToBook(r),
+  }));
+}
+
+export async function upsertBookProgress(clerkUserId: string, bookId: string, currentCardIndex: number, completed: boolean): Promise<void> {
+  const sql = getDb();
+  if (!sql) return;
+  await sql`
+    INSERT INTO user_book_progress (clerk_user_id, book_id, current_card_index, last_read_at, completed_at)
+    VALUES (${clerkUserId}, ${bookId}, ${currentCardIndex}, NOW(), ${completed ? sql`NOW()` : null})
+    ON CONFLICT (clerk_user_id, book_id) DO UPDATE
+    SET current_card_index = ${currentCardIndex},
+        last_read_at = NOW(),
+        completed_at = COALESCE(user_book_progress.completed_at, ${completed ? sql`NOW()` : null})
   `;
 }

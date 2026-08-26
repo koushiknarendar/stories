@@ -20,6 +20,13 @@ const IconExplore = ({ active }: { active: boolean }) => (
   </svg>
 );
 
+const IconBooks = ({ active }: { active: boolean }) => (
+  <svg width={22} height={22} viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+  </svg>
+);
+
 const IconSpace = ({ active }: { active: boolean }) => (
   <svg width={22} height={22} viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
     <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
@@ -36,6 +43,7 @@ const IconProfile = ({ active }: { active: boolean }) => (
 const LEFT_ITEMS  = [
   { href: "/foryou",  label: "Today",   Icon: IconHome },
   { href: "/explore", label: "Explore", Icon: IconExplore },
+  { href: "/books",   label: "Books",   Icon: IconBooks },
 ];
 const RIGHT_ITEMS = [
   { href: "/space",   label: "Library", Icon: IconSpace },

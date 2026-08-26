@@ -35,3 +35,39 @@ export interface Note {
   content: string;
   created_at: string;
 }
+
+export interface Book {
+  id: string;
+  title: string;
+  author: string | null;
+  sourceType: "gutenberg" | "ai-summary" | "upload";
+  sourceRef: string | null;
+  coverImageUrl: string | null;
+  category: string | null;
+  totalCards: number;
+  status: "processing" | "ready" | "error";
+  addedByUser: string;
+  createdAt: string;
+}
+
+export interface BookCard {
+  cardIndex: number;
+  chapterLabel: string | null;
+  kind: "text" | "summary";
+  headline: string | null;
+  excerpt?: string;
+  bullets?: string[];
+  readTime: string | null;
+}
+
+export interface BookWithCards extends Book {
+  cards: BookCard[];
+}
+
+export interface BookProgress {
+  bookId: string;
+  currentCardIndex: number;
+  startedAt: string;
+  lastReadAt: string;
+  completedAt: string | null;
+}

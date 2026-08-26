@@ -11,10 +11,12 @@ const IconHome    = ({ active }: { active: boolean }) => <svg width={22} height=
 const IconExplore = ({ active }: { active: boolean }) => <svg width={22} height={22} viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><circle cx={11} cy={11} r={8}/><path d="m21 21-4.35-4.35"/></svg>;
 const IconSpace   = ({ active }: { active: boolean }) => <svg width={22} height={22} viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>;
 const IconProfile = ({ active }: { active: boolean }) => <svg width={22} height={22} viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx={12} cy={7} r={4}/></svg>;
+const IconBooks   = ({ active }: { active: boolean }) => <svg width={22} height={22} viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>;
 
 const NAV_ITEMS = [
   { href: "/foryou",  label: "Today",   Icon: IconHome },
   { href: "/explore", label: "Explore", Icon: IconExplore },
+  { href: "/books",   label: "Books",   Icon: IconBooks },
   { href: "/space",   label: "Library", Icon: IconSpace },
   { href: "/profile", label: "Profile", Icon: IconProfile },
 ];
