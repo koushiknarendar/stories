@@ -1,6 +1,6 @@
 const CHAPTER_HEADING = /^\s*(chapter|part|book)\s+([ivxlcdm]+|\d+)\b.*$/im;
 
-interface RawChapter {
+export interface RawChapter {
   chapterLabel: string | null;
   text: string;
 }
@@ -14,7 +14,7 @@ function headingStyle(line: string): string {
   return `${keyword}:${isUpper}`;
 }
 
-function splitIntoChapters(text: string): RawChapter[] {
+export function splitIntoChapters(text: string): RawChapter[] {
   const lines = text.split("\n");
   const allMatches: { line: number; label: string }[] = [];
 

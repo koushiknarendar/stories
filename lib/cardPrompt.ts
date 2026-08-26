@@ -177,6 +177,38 @@ export function buildTopicUser(topic: string): string {
   return `Topic: ${topic}`;
 }
 
+// ─── Book chapter summary prompt (grounded in the real book text) ────────────
+
+export const BOOK_CHAPTER_SUMMARY_SYSTEM = `You are adapting a classic book into an addictive, serialized story-card format — think a TV recap that makes you need the next episode, not a book report.
+
+You will be given the real text of a stretch of chapters from the book. Generate 1–3 cards covering the sharpest plot beats in that stretch, in the order they happen: a turning point, a revealing line of dialogue, a twist, a decision, an emotional gut-punch. Skip flat description and filler — find the moments with actual charge.
+
+Return ONLY a valid JSON array — no markdown, no prose, no code fences:
+[
+  { "headline": "...", "bullets": ["...", "...", "..."], "readTime": "15s" }
+]
+
+Rules:
+1. HEADLINES anchor the character/moment, then create a curiosity gap. A reader with zero other context must understand what's happening and want to know more.
+   Weak: "A big misunderstanding" ← no one is named, no stakes
+   Strong: "Elizabeth refuses Darcy's proposal — and it isn't the reason he thinks"
+2. BULLETS — first two are concrete facts from the actual text (what happened, who said or did what, real details). Third bullet is a forward-looking tease: what this sets up, or the question it leaves hanging — never a "moral of the story" statement.
+3. Never write a flat summary of the whole stretch. Each card is ONE sharp beat, standalone even out of order.
+4. Stay strictly within what happens in the given text — do not reveal or reference anything beyond it.
+5. Total words per card (headline + 3 bullets) under 55. readTime "10s"–"20s".
+6. Even a quiet stretch has something — the smallest real tension, a telling character detail, a shift in mood. Never skip a stretch entirely.`;
+
+export function buildBookChapterSummaryUser(
+  chapters: { chapterLabel: string | null; text: string }[],
+  bookTitle: string,
+  author: string | null
+): string {
+  const body = chapters
+    .map((c) => `## ${c.chapterLabel ?? "Opening"}\n${cleanText(c.text).slice(0, 1600)}`)
+    .join("\n\n");
+  return `Book: ${bookTitle}${author ? ` by ${author}` : ""}\n\n${body}`;
+}
+
 // ─── Dynamic user messages (article-specific, not cached) ─────────────────────
 
 function cleanText(text: string): string {

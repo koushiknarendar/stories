@@ -89,7 +89,7 @@ export default function BookReader({ book, initialCardIndex = 0 }: Props) {
         <div style={{ height: "100dvh", scrollSnapAlign: "start", flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16, padding: "0 32px", textAlign: "center", background: "var(--lp-bg)" }}>
           <div style={{ fontSize: 40 }}>📖</div>
           <p style={{ ...SG, fontSize: 18, fontWeight: 700, color: "var(--lp-text)", margin: 0 }}>
-            {book.sourceType === "ai-summary" ? "That's the summary so far" : "You've reached the end"}
+            {book.sourceType === "ai-summary" ? "That's the whole story, in cards" : "You've reached the end"}
           </p>
           <a href="/books" style={{ ...SG, marginTop: 8, padding: "12px 26px", borderRadius: 12, background: "var(--lp-accent)", color: "#fff", fontWeight: 700, fontSize: 14, textDecoration: "none" }}>
             Find another book

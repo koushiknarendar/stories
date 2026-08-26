@@ -36,6 +36,10 @@ function stripIllustrationTags(text: string): string {
   return text.replace(/\[Illustration:?(?:[^[\]]|\[[^[\]]*\])*\]/gi, "").replace(/\n{3,}/g, "\n\n");
 }
 
+export function gutenbergCoverUrl(id: string): string {
+  return `https://www.gutenberg.org/cache/epub/${id}/pg${id}.cover.medium.jpg`;
+}
+
 export function parseGutenbergTitleAuthor(raw: string): { title: string | null; author: string | null } {
   const head = raw.slice(0, 3000);
   const titleMatch = head.match(/^Title:\s*(.+)$/im);
