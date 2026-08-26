@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { useRef } from "react";
-import { useUser } from "@clerk/nextjs";
+import { useAuthReady } from "@/lib/useAuthReady";
 import useSWR, { useSWRConfig } from "swr"; // useSWRConfig used for interests onboarding
 import BottomNav from "@/components/BottomNav";
 import InterestsOnboarding from "@/components/InterestsOnboarding";
@@ -240,7 +240,7 @@ function SkeletonSlide() {
 }
 
 export default function ForYouPage() {
-  const { user, isLoaded } = useUser();
+  const { user, isLoaded } = useAuthReady();
   const containerRef = useRef<HTMLDivElement>(null);
   const { mutate } = useSWRConfig();
 

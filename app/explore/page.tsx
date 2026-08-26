@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { useUser } from "@clerk/nextjs";
+import { useAuthReady } from "@/lib/useAuthReady";
 import useSWR from "swr";
 import BottomNav from "@/components/BottomNav";
 import { CATEGORIES } from "@/lib/categories";
@@ -85,7 +85,7 @@ function StoryList({ stories, SG, formatStoryDate }: {
 }
 
 export default function ExplorePage() {
-  const { user, isLoaded } = useUser();
+  const { user, isLoaded } = useAuthReady();
   const [active, setActive] = useState<string>(CATEGORIES[0].key);
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");

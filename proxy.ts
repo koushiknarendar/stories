@@ -5,7 +5,12 @@ const isProtected = createRouteMatcher(["/space(.*)", "/collections(.*)", "/inbo
 
 export const proxy = clerkMiddleware(async (auth, request) => {
   if (isProtected(request as NextRequest)) {
-    await auth.protect({ unauthenticatedUrl: new URL("/sign-in", request.url).toString() });
+    // TEMPORARY: the deployed Clerk publishable key is a development-instance
+    // key, which can't attribute requests from this custom domain ("Invalid
+    // host" / host_invalid) — the client SDK never finishes loading, so the
+    // dedicated /sign-in page hangs forever. Send guests home instead of into
+    // that dead end until a proper Clerk production instance is configured.
+    await auth.protect({ unauthenticatedUrl: new URL("/", request.url).toString() });
   }
 });
 

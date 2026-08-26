@@ -15,7 +15,7 @@ interface Props {
 }
 
 export default function BookReader({ book, initialCardIndex = 0 }: Props) {
-  const { isSignedIn } = useUser();
+  const { isLoaded, isSignedIn } = useUser();
   const containerRef = useRef<HTMLDivElement>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasScrolledToStart = useRef(false);
@@ -65,7 +65,7 @@ export default function BookReader({ book, initialCardIndex = 0 }: Props) {
         <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
       </a>
 
-      {!isSignedIn && (
+      {isLoaded && !isSignedIn && (
         <div style={{ position: "absolute", top: "calc(env(safe-area-inset-top, 0px) + 14px)", right: 14, zIndex: 20 }}>
           <SignInButton mode="modal">
             <button style={{ ...SG, padding: "8px 14px", borderRadius: 999, border: "1px solid var(--lp-glass-border)", background: "var(--lp-glass-surface)", backdropFilter: "var(--lp-glass-blur)", WebkitBackdropFilter: "var(--lp-glass-blur)", color: "var(--lp-text)", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>

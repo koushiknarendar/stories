@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useUser, SignOutButton } from "@clerk/nextjs";
+import { SignOutButton } from "@clerk/nextjs";
+import { useAuthReady } from "@/lib/useAuthReady";
 import useSWR from "swr";
 import { useTheme } from "@/components/ThemeProvider";
 import BottomNav from "@/components/BottomNav";
@@ -35,7 +36,7 @@ const ALL_BADGES = [
 ];
 
 export default function ProfilePage() {
-  const { user, isLoaded } = useUser();
+  const { user, isLoaded } = useAuthReady();
   const { theme, toggle } = useTheme();
   const [editingInterests, setEditingInterests] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
