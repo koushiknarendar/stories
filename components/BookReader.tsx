@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, useEffect, useCallback } from "react";
-import { useUser, SignInButton } from "@clerk/nextjs";
+import { useUser, SignInButton } from "@/lib/clerkStub";
 import BookCard from "@/components/BookCard";
 import BottomNav from "@/components/BottomNav";
 import type { BookWithCards } from "@/lib/types";

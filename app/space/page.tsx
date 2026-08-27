@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { useUser } from "@clerk/nextjs";
+import { useUser } from "@/lib/clerkStub";
 import useSWR from "swr";
 import { useTheme } from "@/components/ThemeProvider";
 import BottomNav from "@/components/BottomNav";

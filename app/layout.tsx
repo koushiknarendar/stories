@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { ClerkProvider } from "@clerk/nextjs";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { Hanken_Grotesk, Space_Grotesk } from "next/font/google";
 import DesktopNav from "@/components/DesktopNav";
@@ -31,39 +30,15 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // TEMPORARY: ClerkProvider is disabled — the deployed publishable key is a
+  // development-instance key that can't attribute requests from this custom
+  // domain ("Invalid host" / host_invalid), and clerk-js retried the failing
+  // bootstrap fetch on every page load. Every client-side Clerk import in
+  // this app now resolves to lib/clerkStub.tsx instead of the real package,
+  // so nothing here depends on this provider actually being mounted. Restore
+  // it (and swap the stub imports back) once a real Clerk production
+  // instance is configured for storis.in.
   return (
-    <ClerkProvider
-      signInFallbackRedirectUrl="/foryou"
-      appearance={{
-        variables: {
-          colorPrimary: "#7C5CFF",
-          colorBackground: "#ffffff",
-          colorText: "#15131F",
-          colorTextSecondary: "#54506B",
-          colorInputBackground: "#f5f4fb",
-          colorInputText: "#15131F",
-          colorNeutral: "#15131F",
-          colorShimmer: "#f0eefb",
-          borderRadius: "12px",
-        },
-        elements: {
-          card: {
-            backgroundColor: "#ffffff",
-            color: "#15131F",
-            boxShadow: "0 24px 64px -16px rgba(0,0,0,0.22)",
-          },
-          formFieldInput: {
-            backgroundColor: "#f5f4fb",
-            color: "#15131F",
-            borderColor: "#e7e4f2",
-          },
-          modalBackdrop: {
-            backgroundColor: "rgba(0,0,0,0.5)",
-            backdropFilter: "blur(6px)",
-          },
-        },
-      }}
-    >
       <html lang="en" suppressHydrationWarning className={`h-full ${hanken.variable} ${spaceGrotesk.variable}`}>
         <head>
           <script
@@ -101,6 +76,5 @@ export default function RootLayout({
           </ThemeProvider>
         </body>
       </html>
-    </ClerkProvider>
   );
 }

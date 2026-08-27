@@ -10,7 +10,7 @@ import {
 } from "framer-motion";
 import { addToCurate, recordDislike } from "@/lib/storage";
 import { useTheme } from "@/components/ThemeProvider";
-import { useUser, useClerk, SignInButton } from "@clerk/nextjs";
+import { useUser, useClerk, SignInButton } from "@/lib/clerkStub";
 import type { StorySet } from "@/lib/types";
 import BottomNav from "@/components/BottomNav";
 import CollectionPicker from "@/components/CollectionPicker";

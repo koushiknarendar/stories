@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useUser, SignInButton } from "@clerk/nextjs";
+import { useUser, SignInButton } from "@/lib/clerkStub";
 import { saveCurrent } from "@/lib/storage";
 import { useTheme } from "@/components/ThemeProvider";
 import LandingCardStack from "@/components/LandingCardStack";

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useUser } from "@clerk/nextjs";
+import { useUser } from "@/lib/clerkStub";
 import CollectionPicker from "@/components/CollectionPicker";
 import BottomNav from "@/components/BottomNav";
 import type { StorySet } from "@/lib/types";

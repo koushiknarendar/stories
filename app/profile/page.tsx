@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { SignOutButton } from "@clerk/nextjs";
+import { SignOutButton } from "@/lib/clerkStub";
 import { useAuthReady } from "@/lib/useAuthReady";
 import useSWR from "swr";
 import { useTheme } from "@/components/ThemeProvider";

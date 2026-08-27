@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useUser } from "@clerk/nextjs";
+import { useUser } from "@/lib/clerkStub";
 
 // TEMPORARY: the deployed Clerk publishable key is a development-instance
 // key, which can't attribute requests from this custom domain — the client

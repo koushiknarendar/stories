@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useUser } from "@clerk/nextjs";
+import { useUser } from "@/lib/clerkStub";
 import { getCurrent } from "@/lib/storage";
 import StoryReader from "@/components/StoryReader";
 import ShortPlayer from "@/components/ShortPlayer";
